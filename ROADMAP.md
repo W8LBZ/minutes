@@ -1,12 +1,13 @@
 # Roadmap
 
-Planned work, roughly in priority order. Each item becomes its own branch and PR.
+Planned work, roughly in priority order. Each item becomes its own branch and PR; when it merges, it leaves this file and gets a line in the changelog.
+
+Finished work moves to [CHANGELOG.md](CHANGELOG.md).
 
 ## Next
-- **Email the minutes on Submit:** the PDF plus the chow list to everyone on the roster, from the club Gmail, with Reply-To set to the leader. Goes through email test mode (`email.only_to`) until the club is ready.
-- **Members' roster page:** name, callsign, license class, officer role, status and member since, for signed-in members. Phone and address are never shown.
-- **Archive page that stays manageable:** group meetings by year (collapsible, current year open) with a year filter, plus paging within long years.
-- **Stats page:** the same year filter, defaulting to the last 12 months, with all-time optional.
+- **Tracked business items** (see below): the fix for follow-ups that get dropped.
+- **Chow list module** (see below), which also brings the chow list attachment to the minutes email.
+- **Email the minutes to the whole club:** remove test mode (`email.only_to`) once the club is ready.
 
 ## Chow list (its own section of the app, separate from the minutes)
 The chow rotation isn't part of the meeting itself, so it gets its own pages; the minutes only reference it.

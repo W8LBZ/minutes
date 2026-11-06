@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import logging
 import re
+from importlib.metadata import version
 from pathlib import Path
 from urllib.parse import quote
 
@@ -57,7 +58,7 @@ templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
 templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
 templates.env.filters["by_last_name"] = by_last_name
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
-templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS)
+templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"))
 
 
 # ---------------- login gate ----------------

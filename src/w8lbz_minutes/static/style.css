@@ -45,3 +45,4 @@ details.year > summary .muted { font-size: .9rem; font-weight: normal; }
 .linkcard:hover { background: #eef2e6; border-color: #2f3d1c; }
 .linkcard .ico { width: 2.6rem; height: 2.6rem; } .linkcard .label { font-weight: 600; }
 .linkcard .host { font-size: .8rem; color: #667; word-break: break-all; }
+footer.site { text-align: center; font-size: .8rem; padding: 2rem 0 1rem; } footer.site a { color: #889; text-decoration: none; }

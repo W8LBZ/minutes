@@ -166,3 +166,10 @@ def test_link_icons():
     assert link_icon("https://minutes.example.ts.net/bylaws") == "document"
     assert link_icon("https://w8lbz.org") == "globe"
     assert link_icon("https://example.org/some/page") == "link"
+
+
+def test_footer_shows_version(monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    assert f"W8LBZ Minutes v{web.version('w8lbz-minutes')}" in TestClient(web.app).get("/links").text
