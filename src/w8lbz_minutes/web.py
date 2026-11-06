@@ -5,7 +5,7 @@ import datetime as dt
 import json
 import logging
 import re
-from importlib.metadata import version
+from importlib.metadata import metadata, requires, version
 from pathlib import Path
 from urllib.parse import quote
 
@@ -340,6 +340,41 @@ def link_host(url: str) -> str:
 
 
 templates.env.filters["link_host"] = link_host
+
+
+def _license(dist: str) -> str:
+    md = metadata(dist)
+    lic = md.get("License-Expression") or ""
+    if not lic:
+        lic = next((c.split(" :: ")[-1] for c in md.get_all("Classifier") or [] if c.startswith("License ::")), "")
+    if not lic and len(md.get("License") or "") <= 40:
+        lic = md.get("License") or ""
+    return lic.replace(" Software License", "").replace(" License", "") or "see project"
+
+
+def dependencies() -> list[dict]:
+    """The app's direct dependencies, as installed: name, version, license and home page."""
+    out = []
+    for req in requires("w8lbz-minutes") or []:
+        if "extra ==" in req:
+            continue
+        name = re.split(r"[\s\[<>=!~;]", req, maxsplit=1)[0]
+        md = metadata(name)
+        urls = dict(u.split(", ", 1) for u in md.get_all("Project-URL") or [] if ", " in u)
+        home = md.get("Home-page") or urls.get("Homepage") or urls.get("Source") or next(iter(urls.values()), None)
+        out.append({"name": md["Name"], "version": version(name), "license": _license(name), "url": home})
+    return sorted(out, key=lambda d: d["name"].lower())
+
+
+@app.get("/about", response_class=HTMLResponse)
+def about(request: Request):
+    import markdown
+    changes = (Path(__file__).resolve().parents[2] / "CHANGELOG.md")
+    changelog = None
+    if changes.exists():  # show the versions, without the file's own title and intro
+        text = re.sub(r"## Unreleased\s*(?=## )", "", changes.read_text())  # hide an empty Unreleased section
+        changelog = Markup(markdown.markdown(text[text.find("\n## "):]))
+    return page(request, "about.html", deps=dependencies(), changelog=changelog, license=_license("w8lbz-minutes"))
 
 
 @app.get("/links", response_class=HTMLResponse)
