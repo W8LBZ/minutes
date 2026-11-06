@@ -2,21 +2,25 @@
 <div class="login">
   <img src="/static/logo.png" alt="" class="loginlogo">
   <h1>Sign in to W8LBZ Minutes</h1>
-  {% if error == 'link' %}<p class="msg err">That sign-in link has expired or was already used. Request a new one below.</p>{% endif %}
-  {% if sent %}<p class="msg ok">If that address is on the club roster, a sign-in link is on its way. It works once, for 15 minutes.</p>{% endif %}
 
   <div id="pkbox" hidden>
     <button id="pkbtn" class="btn big" type="button">Sign in with a passkey</button>
-    <p id="pkerr" class="msg err" hidden></p>
+    <p id="pkerr" class="note err" hidden></p>
     <p class="or">or</p>
   </div>
 
   <form method="post" action="/login/email">
-    <label>Email me a sign-in link<input type="email" name="email" required autocomplete="email" placeholder="The email address on the club roster"></label>
+    <label for="email">Email me a sign-in link</label>
+    <input id="email" type="email" name="email" required autocomplete="email" placeholder="you@example.com">
+    <small class="help">Use the address the club has on its roster.</small>
     <input type="hidden" name="next" value="{{ next }}">
-    <button class="btn" type="submit">Send link</button>
+    <button class="btn big" type="submit">Send link</button>
   </form>
-  <p class="muted small">Members only. Use the address the club has on file; ask a club officer if it's changed.</p>
+
+  {% if sent %}<p class="note ok">If that address is on the club roster, a sign-in link is on its way. It works once, for 15 minutes.</p>{% endif %}
+  {% if error == 'link' %}<p class="note err">That sign-in link has expired or was already used. Request a new one above.</p>{% endif %}
+
+  <p class="muted small">Members only. If your email address has changed, ask a club officer to update the roster.</p>
 </div>
 <script src="/static/auth.js"></script>
 <script>

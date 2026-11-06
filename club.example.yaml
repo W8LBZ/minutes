@@ -14,6 +14,11 @@ auth:
   rp_name: W8LBZ Minutes
   session_days: 180                      # "remember this device"
 
+email:
+  # TEST MODE: while this list is present, email only goes to these callsigns or addresses.
+  # Everything else is withheld and logged. Remove only_to to email members for real.
+  only_to: [KD8XYZ]
+
 links:  # shown in the "Club Links" footer of the minutes
   - label: Teams meeting
     url: https://teams.live.com/meet/REPLACE_ME

@@ -16,7 +16,7 @@ def a(tmp_path, monkeypatch):
                         {"id": "kd8bbb", "first": "Old", "last": "Timer", "email": "old@example.org", "status": "Silent Key"}])
     club.auth = {"rp_id": "localhost"}
     sent = []
-    monkeypatch.setattr(auth_mod, "send_email", lambda to, subj, body, *x: sent.append((to, body)))
+    monkeypatch.setattr(auth_mod, "send_email", lambda to, subject, body, **kw: sent.append((to, body)))
     obj = Auth(club, tmp_path / "auth.sqlite")
     obj.sent = sent
     return obj
@@ -73,3 +73,32 @@ def test_admin_link(a):
     url = a.create_link("kd8aaa", base_url="https://minutes.example")
     assert url.startswith("https://minutes.example/login/link?t=")
     assert a.use_link(url.split("t=")[1]) == ("kd8aaa", "/")
+
+
+def test_email_test_mode_withholds_other_recipients(monkeypatch):
+    calls = []
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def starttls(self): pass
+        def login(self, user, password): calls.append(("login", password))
+        def send_message(self, msg): calls.append(("send", msg["To"]))
+
+    monkeypatch.setattr(auth_mod.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setenv("W8LBZ_SMTP_USER", "club@example.org")
+    monkeypatch.setenv("W8LBZ_SMTP_PASSWORD", "abcd efgh ijkl mnop")
+    allow = {"me@example.org"}
+    assert auth_mod.send_email("someone@example.org", "s", "b", only_to=allow) is False
+    assert calls == []
+    assert auth_mod.send_email("Me@Example.org", "s", "b", only_to=allow) is True
+    assert calls == [("login", "abcdefghijklmnop"), ("send", "Me@Example.org")]
+
+
+def test_only_to_resolves_callsigns():
+    club = Club(FIX / "test-club.yaml", roster=[{"id": "kd8aaa", "first": "J", "last": "D", "email": "J@x.org"}])
+    club.email = {"only_to": ["KD8AAA", "other@y.org"]}
+    assert club.email_only_to() == {"j@x.org", "other@y.org"}
+    club.email = {}
+    assert club.email_only_to() is None
