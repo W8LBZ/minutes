@@ -56,6 +56,8 @@ class Club:
         cfg = yaml.safe_load(path.read_text()) or {}
         self.info = cfg.get("club", {})
         self.links = cfg.get("links", [])
+        self.auth = cfg.get("auth") or {}
+        self.email = cfg.get("email") or {}
         self.redact = [_n(x) for x in (cfg.get("privacy") or {}).get("never_record", [])]
 
         if roster is None and "members" in cfg:  # inline members (tests, example config)
@@ -86,6 +88,19 @@ class Club:
             for m in group:
                 if not m.short and len(group) > 1 and m.last:
                     m.short = f"{m.first} {m.last[0]}"
+
+    def email_only_to(self) -> set[str] | None:
+        """Test mode: if club.yaml has email.only_to (callsigns or addresses), mail goes only to them."""
+        only = self.email.get("only_to")
+        if only is None:
+            return None
+        out = set()
+        for x in only:
+            m = self.members.get(str(x).lower())
+            addr = m.email if m else str(x)
+            if addr and "@" in addr:
+                out.add(addr.strip().lower())
+        return out
 
     # ---- permissions ----
     def can_lead(self, mid: str) -> bool:

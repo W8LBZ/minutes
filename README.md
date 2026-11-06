@@ -35,6 +35,15 @@ curl -fsSL https://raw.githubusercontent.com/W8LBZ/minutes/main/deploy/setup.sh 
 Then put `club.yaml` and `google-service-account.json` in `/etc/w8lbz-minutes/`, and data in `/var/lib/w8lbz-minutes/`.
 The app runs as the `minutes` user on port 8000. The roster syncs daily at 04:00.
 
+## Login
+Members sign in with a passkey, or with a one-time link emailed to their roster address.
+- **Passkeys** only work at the HTTPS address in `club.yaml` (`auth.rp_id`).
+- **Email** needs `W8LBZ_SMTP_USER` / `W8LBZ_SMTP_PASSWORD` (a Gmail app password) in `/etc/w8lbz-minutes/env`.
+  Without them, links are written to the server log instead.
+- **Recovery:** an admin on the server can print a one-time link for a member: `w8lbz-minutes login-link KO4CGQ`
+
+Only officers and members ticked `minutes_editor` in the roster can use the leader console.
+
 ## Config
 `club.yaml` (local only, git-ignored; copy from `club.example.yaml`) holds the club links, the leaders and editors lists, the private never-record list, and a stopgap roster. The Google Sheet roster will replace the roster part.
 
