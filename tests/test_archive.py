@@ -67,3 +67,12 @@ def test_membership_log():
                     {"callsign": "", "full_name": "Old Timer", "date": "", "event": "Silent Key"}])
     assert ms[0]["officer"] and ms[0]["member_since"] == "2026-01-21"
     assert ms[1]["id"] == "old-timer" and ms[1]["events"][0]["event"] == "Silent Key"
+
+
+def test_links_page_lists_club_links(monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    monkeypatch.setattr(web.archive.club, "links", [{"label": "Club Discord", "url": "https://discord.example/x"}])
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    html = TestClient(web.app).get("/links").text
+    assert '<a href="https://discord.example/x">Club Discord</a>' in html and 'href="/links"' in html

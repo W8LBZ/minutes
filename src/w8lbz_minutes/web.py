@@ -267,6 +267,11 @@ def member(request: Request, mid: str):
                 total=len(archive.meetings))
 
 
+@app.get("/links", response_class=HTMLResponse)
+def links(request: Request):
+    return page(request, "links.html")
+
+
 @app.get("/stats", response_class=HTMLResponse)
 def stats(request: Request):
     return page(request, "stats.html", s=archive.stats())
