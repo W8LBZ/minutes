@@ -248,3 +248,40 @@ def test_admin_mode(tmp_path, monkeypatch):
     c.cookies.set(web.COOKIE, a.new_session("kd8ccc"))                    # not an admin: can't turn it on
     assert c.post("/admin/mode", data={"on": 1}).status_code == 403
     assert "Turn on admin mode" not in c.get("/links").text
+
+
+def test_view_as_is_read_only_and_needs_admin_mode(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    from w8lbz_minutes.auth import Auth
+    from w8lbz_minutes.store import Archive
+    club = Club(FIX / "test-club.yaml", roster=[
+        {"id": "ko4cgq", "first": "Jim", "last": "F", "callsign": "KO4CGQ"},
+        {"id": "pat", "first": "Pat", "last": "Treasurer", "officer": True, "phone": "419-555-0142"},
+        {"id": "bob", "first": "Bob", "last": "Member", "phone": "419-555-0199"}])
+    club.admins = {"ko4cgq"}
+    a = Auth(club, tmp_path / "auth.sqlite")
+    monkeypatch.setattr(web, "archive", Archive(root=tmp_path, club=club))
+    monkeypatch.setattr(web, "authn", a)
+    monkeypatch.setattr(web, "DATA", tmp_path)
+    c = TestClient(web.app)
+    c.cookies.set(web.COOKIE, a.new_session("ko4cgq"))
+    assert c.post("/admin/view-as", data={"member": "bob"}).status_code == 403   # admin mode is off
+    c.post("/admin/mode", data={"on": 1})
+    assert "View the app as Bob" in c.get("/members/bob").text
+    c.post("/admin/view-as", data={"member": "bob", "next": "/links"})
+    page = c.get("/members/pat").text
+    assert "Viewing the app as <b>Bob Member</b>" in page
+    assert "419-555-0142" not in page                     # Bob can't see Pat's unshared phone, so neither can Jim now
+    assert "Bob ▾" in c.get("/links").text and "Jim ▾" not in c.get("/links").text  # the name menu is Bob's
+    assert c.post("/profile", data={"phone": "1"}).status_code == 403          # read-only
+    assert c.get("/account").status_code == 403                                 # not their sign-ins or passkeys
+    assert c.get("/roster/changes").status_code == 403                          # Bob's permissions, not admin's
+    c.post("/admin/view-as", data={"member": ""})
+    page = c.get("/members/pat").text
+    assert "Viewing the app as" not in page and "419-555-0142" in page          # back to admin mode
+    c.post("/admin/view-as", data={"member": "pat"})
+    c.post("/admin/mode", data={"on": 0})                                        # ending admin mode ends viewing as
+    assert "Viewing the app as" not in c.get("/links").text
+    log = [json.loads(x) for x in (tmp_path / "admin-log.jsonl").read_text().splitlines()]
+    assert [e.get("view_as") for e in log if "view_as" in e] == ["bob", None, "pat"]

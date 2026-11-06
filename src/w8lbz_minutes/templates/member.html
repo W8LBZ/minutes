@@ -1,6 +1,8 @@
 {% extends "base.html" %}{% from "_lock.html" import lock %}{% block body %}
 <h1>{{ member.name or member.last }}{% if member.callsign %} <span class="cs">{{ member.callsign }}</span>{% endif %}</h1>
 <p class="muted">{{ [member.license_class, member.role, member.status if member.status != 'Active']|select|join(' · ') }}</p>
+{% if can_view_as %}<form method="post" action="/admin/view-as"><input type="hidden" name="member" value="{{ member.id }}"><input type="hidden" name="next" value="/">
+  <button class="btn small ghost" type="submit" title="See the app exactly as {{ member.first }} does, read-only (admin mode)">View the app as {{ member.first }}</button></form>{% endif %}
 
 {% set shown = contact|selectattr(1)|list %}
 {% if shown or is_me %}<h2>Contact{% if is_me %} <a class="small" href="/profile">edit</a>{% endif %}</h2>

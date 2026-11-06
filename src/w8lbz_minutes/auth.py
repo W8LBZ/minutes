@@ -84,8 +84,11 @@ class Auth:
         cols = {r["name"] for r in self.db.execute("pragma table_info(passkeys)")}
         if "aaguid" not in cols:  # added after the first release
             self.db.execute("alter table passkeys add column aaguid text")
-        if "admin_until" not in {r["name"] for r in self.db.execute("pragma table_info(sessions)")}:
+        session_cols = {r["name"] for r in self.db.execute("pragma table_info(sessions)")}
+        if "admin_until" not in session_cols:
             self.db.execute("alter table sessions add column admin_until integer")
+        if "view_as" not in session_cols:
+            self.db.execute("alter table sessions add column view_as text")
         os.chmod(path, 0o600)
 
     # ---------------- sessions ----------------
@@ -125,8 +128,18 @@ class Auth:
         if not row or not self.club.is_admin(row["member"]):
             return None
         until = int(time.time()) + minutes * 60 if minutes else None
-        self.db.execute("update sessions set admin_until=? where token_hash=?", (until, _hash(token)))
+        self.db.execute("update sessions set admin_until=?, view_as=null where token_hash=?", (until, _hash(token)))
         return until
+
+    def view_as(self, token: str | None) -> str | None:
+        """The member an admin is viewing the app as (read-only), only while admin mode is on."""
+        if not self.admin_until(token):
+            return None
+        row = self.db.execute("select view_as from sessions where token_hash=?", (_hash(token),)).fetchone()
+        return row["view_as"] if row else None
+
+    def set_view_as(self, token: str, member: str | None) -> None:
+        self.db.execute("update sessions set view_as=? where token_hash=?", (member, _hash(token)))
 
     def end_session(self, token: str | None) -> None:
         if token:

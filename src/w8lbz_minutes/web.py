@@ -78,9 +78,21 @@ templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=versi
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     archive.club.refresh()  # pick up a roster sync without a restart
-    request.state.member = authn.member_for(request.cookies.get(COOKIE))
-    request.state.admin_until = authn.admin_until(request.cookies.get(COOKIE)) if request.state.member else None
+    token = request.cookies.get(COOKIE)
+    real = authn.member_for(token)
+    request.state.real_member = real
+    request.state.admin_until = authn.admin_until(token) if real else None
+    # "View as": an admin in admin mode sees the app exactly as another member does, read-only.
+    va = authn.view_as(token) if request.state.admin_until else None
+    request.state.viewing_as = va if va in archive.club.members and va != real else None
+    request.state.member = request.state.viewing_as or real
     path = request.url.path
+    if request.state.viewing_as:
+        request.state.admin_until = None  # their permissions, not the admin's
+        if path.startswith(("/account", "/profile/email", "/logout", "/auth/")) or (
+                request.method not in ("GET", "HEAD") and not path.startswith("/admin/")):
+            return HTMLResponse("You're viewing the app as another member, which is read-only. "
+                                "Stop viewing as them (banner at the top) to make changes.", status_code=403)
     if request.state.member or path.startswith(PUBLIC_PATHS):
         return await call_next(request)
     if request.method == "GET" and not path.startswith("/api/"):
@@ -91,6 +103,11 @@ async def require_login(request: Request, call_next):
 
 def me(request: Request) -> str:
     return request.state.member
+
+
+def real_me(request: Request) -> str:
+    """The signed-in member, even while viewing the app as someone else."""
+    return request.state.real_member
 
 
 def admin_mode(request: Request) -> bool:
@@ -122,6 +139,7 @@ def page(request: Request, name: str, **ctx) -> HTMLResponse:
         "me": archive.club.members.get(mid) if mid else None,
         "can_lead": (archive.club.can_lead(mid) or admin_mode(request)) if mid else False,
         "is_admin": archive.club.is_admin(mid), "admin_until": getattr(request.state, "admin_until", None),
+        "viewing_as": getattr(request.state, "viewing_as", None),
         "rp_id": authn.rp_id, **ctx})
 
 
@@ -317,19 +335,36 @@ async def chow_constraints(request: Request, mid: str = Depends(chow_leader)):
 ADMIN_MINUTES = 60
 
 
-@app.post("/admin/mode")
-def admin_mode_switch(request: Request, on: int = Form(0), next: str = Form("/"), mid: str = Depends(me)):
-    """Admins turn admin mode on (for ADMIN_MINUTES) or off for this sign-in. Every switch is logged."""
-    if not archive.club.is_admin(mid):
-        raise HTTPException(403, "You aren't listed as an admin.")
-    until = authn.set_admin(request.cookies.get(COOKIE), ADMIN_MINUTES if on else 0)
-    entry = {"at": int(dt.datetime.now().timestamp()), "member": mid, "on": bool(on), "until": until,
-             "ip": request.client.host if request.client else None}
+def _admin_log(request: Request, **entry) -> None:
+    entry = {"at": int(dt.datetime.now().timestamp()), "member": request.state.real_member,
+             "ip": request.client.host if request.client else None, **entry}
     p = DATA / "admin-log.jsonl"
     with p.open("a") as f:
         f.write(json.dumps(entry) + "\n")
     p.chmod(0o600)
+
+
+@app.post("/admin/mode")
+def admin_mode_switch(request: Request, on: int = Form(0), next: str = Form("/"), mid: str = Depends(real_me)):
+    """Admins turn admin mode on (for ADMIN_MINUTES) or off for this sign-in. Every switch is logged."""
+    if not archive.club.is_admin(mid):
+        raise HTTPException(403, "You aren't listed as an admin.")
+    until = authn.set_admin(request.cookies.get(COOKIE), ADMIN_MINUTES if on else 0)
+    _admin_log(request, on=bool(on), until=until)
     _log.info("admin mode %s for %s", "on" if on else "off", mid)
+    return RedirectResponse(_safe_next(next), status_code=303)
+
+
+@app.post("/admin/view-as")
+def admin_view_as(request: Request, member: str = Form(""), next: str = Form("/"), mid: str = Depends(real_me)):
+    """Start (member=id) or stop (member empty) viewing the app as another member. Admin mode only; logged."""
+    if not authn.admin_until(request.cookies.get(COOKIE)):
+        raise HTTPException(403, "Turn on admin mode first.")
+    if member and (member not in archive.club.members or member == mid):
+        raise HTTPException(404)
+    authn.set_view_as(request.cookies.get(COOKIE), member or None)
+    _admin_log(request, view_as=member or None)
+    _log.info("%s %s", mid, f"viewing as {member}" if member else "stopped viewing as another member")
     return RedirectResponse(_safe_next(next), status_code=303)
 
 
@@ -541,7 +576,8 @@ def member(request: Request, mid: str):
     elevated = admin_mode(request)
     contact = [(f, v if v and club.can_see(viewer, mid, f, elevated) else None, href) for f, (v, href) in values.items()]
     return page(request, "member.html", member=m, h=archive.member_history(mid), total=len(archive.meetings),
-                contact=contact, is_me=viewer == mid, is_officer=privileged(request))
+                contact=contact, is_me=viewer == mid, is_officer=privileged(request),
+                can_view_as=elevated and mid != request.state.real_member)
 
 
 @app.get("/roster", response_class=HTMLResponse)

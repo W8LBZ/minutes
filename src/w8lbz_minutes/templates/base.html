@@ -8,12 +8,14 @@
   {% if me %}<a href="/">Archive</a><a href="/roster">Roster</a><a href="/stats">Stats</a><a href="/chow">Chow</a><a href="/guests">Guests</a><a href="/links">Links</a>{% if can_lead %}<a href="/console">Lead a meeting</a>{% endif %}
   <form action="/search"><input name="q" type="search" placeholder="Search all minutes…" value="{{ q or '' }}"></form>
   <details class="menu"><summary class="me">{{ me.short or me.first }} ▾</summary>
-    <div class="drop"><a href="/profile">Your profile</a><a href="/account">Sign-in &amp; passkeys</a><a href="/about">About</a>
+    <div class="drop"><a href="/profile">Your profile</a><a href="/account">Sign-in &amp; passkeys</a><a href="/about">About</a>{% if PREVIEW %}<a href="/preview/outbox">Email outbox (preview)</a>{% endif %}
     {% if is_admin %}<form method="post" action="/admin/mode"><input type="hidden" name="on" value="{{ 0 if admin_until else 1 }}"><input type="hidden" name="next" value="{{ request.url.path }}">
       <button type="submit">{{ 'Turn off admin mode' if admin_until else 'Turn on admin mode' }}</button></form>{% endif %}
     <form method="post" action="/logout"><button type="submit">Sign out</button></form></div>
   </details>{% endif %}
 </nav>
+{% if viewing_as %}<div class="adminbar viewas">Viewing the app as <b>{{ club.name(viewing_as) }}</b>: read-only, exactly what they see.
+<form method="post" action="/admin/view-as"><input type="hidden" name="member" value=""><input type="hidden" name="next" value="/members/{{ viewing_as }}"><button type="submit">Stop</button></form></div>{% endif %}
 {% if admin_until %}<div class="adminbar">Admin mode is on until {{ admin_until|clock }}: you can see and change what officers can.
 <form method="post" action="/admin/mode"><input type="hidden" name="on" value="0"><input type="hidden" name="next" value="{{ request.url.path }}"><button type="submit">Turn off</button></form></div>{% endif %}
 {% if PREVIEW %}<div class="preview">PREVIEW of <b>{{ PREVIEW }}</b>: a copy of the data. Emails aren't sent (see the <a href="/preview/outbox">outbox</a>) and roster edits don't reach the real sheet.</div>{% endif %}

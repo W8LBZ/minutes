@@ -79,3 +79,4 @@ ol.rotation, ul.rotation { padding-left: 0; list-style: none; } .rotation .n { d
 ol.rotation li, ul.rotation li { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .8rem; }
 ol.rotation .who, ul.rotation .who { min-width: 11rem; } ol.rotation .ops { margin-left: auto; display: flex; align-items: center; gap: .2rem; }
 ol.rotation li > details.edit[open], ol.rotation .ops details.edit[open] { flex-basis: 100%; }
+.adminbar.viewas { background: #4b2a7a; }
