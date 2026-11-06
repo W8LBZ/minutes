@@ -5,6 +5,9 @@ club:
   name: Example Radio Club
   callsign: W0XYZ
   meeting_day: Thursday
+  date_formats:          # strftime codes; %-d = day without leading zero
+    list: "%b %-d, %Y"    # tables, e.g. Nov 5, 2026
+    document: "%B %-d, %Y"  # minutes header, e.g. November 5, 2026
 
 links:  # shown in the "Club Links" footer of the minutes
   - label: Teams meeting

@@ -1,7 +1,12 @@
 {% extends "base.html" %}{% block title %}Minutes {{ m.date }}{% endblock %}{% block body %}
 <div class="actions">
-  <a class="btn" href="/meetings/{{ m.slug }}/minutes.pdf">Download PDF</a>
+  {% if m.status == 'draft' %}<a class="btn" href="/console/{{ m.slug }}">Open in the leader console</a>{% endif %}
+  {% if m.status != 'draft' %}<a class="btn" href="/meetings/{{ m.slug }}/minutes.pdf">Download PDF</a>{% endif %}
   {% if has_original %}<a class="btn ghost" href="/meetings/{{ m.slug }}/original.pdf">View original</a>{% endif %}
 </div>
-{% include "_minutes.html" %}
+{% if m.status == 'draft' %}<p class="badge warn" style="display:inline-block">Meeting in progress: this page updates live</p>{% endif %}
+<div id="doc">{% include "_minutes.html" %}</div>
+{% if m.status == 'draft' %}<script>
+setInterval(async () => { const r = await fetch("/api/meetings/{{ m.slug }}/live"); if (r.ok) document.getElementById("doc").innerHTML = await r.text(); }, 5000);
+</script>{% endif %}
 {% endblock %}
