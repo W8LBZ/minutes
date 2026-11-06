@@ -1,6 +1,7 @@
 """Archive access: loads meetings from disk; full-text search, stats, guest tracking."""
 from __future__ import annotations
 
+import datetime as dt
 import re
 import sqlite3
 from collections import defaultdict
@@ -98,10 +99,14 @@ class Archive:
                 grp["visits"].append((m.date, g.get("notes", "")))
         for grp in groups.values():
             grp["member"] = self._member_for_guest(grp)
-            if grp["member"]:
-                first_member = min((m.date for m in self.meetings
-                                    if grp["member"] in m.in_person + m.remote), default=None)
-                grp["joined"] = first_member
+            if grp["member"]:  # the roster's member-since date, else their first meeting as a member
+                since = self.club.members[grp["member"]].member_since
+                try:
+                    grp["joined"] = dt.date.fromisoformat(since) if since else None
+                except ValueError:
+                    grp["joined"] = None
+                grp["joined"] = grp["joined"] or min((m.date for m in self.meetings
+                                                      if grp["member"] in m.in_person + m.remote), default=None)
         return sorted(groups.values(), key=lambda g: (-len(g["visits"]), g["name"]))
 
     def _member_for_guest(self, grp: dict) -> str | None:
