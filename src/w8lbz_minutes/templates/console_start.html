@@ -6,7 +6,7 @@
 <h2>Start a new meeting</h2>
 <form method="post" action="/console/start" class="startform">
   <label>Date <input type="date" name="date" value="{{ today.isoformat() }}" required></label>
-  <label>Led by <select name="leader">{% for id in leaders %}<option value="{{ id }}">{{ club.name(id) }}</option>{% endfor %}</select></label>
+  <label>Led by <select name="leader">{% for id in leaders %}<option value="{{ id }}" {{ 'selected' if me and id == me.id }}>{{ club.name(id) }}</option>{% endfor %}</select></label>
   <button class="btn" type="submit">Start meeting</button>
 </form>
 <p class="muted">Old Business and Upcoming Events are copied from the previous meeting, so you only remove what's finished and add what's new.</p>

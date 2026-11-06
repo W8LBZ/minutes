@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% block title %}Sign in · W8LBZ Minutes{% endblock %}{% block body %}
+<div class="login">
+  <img src="/static/logo.png" alt="" class="loginlogo">
+  <h1>Sign in to W8LBZ Minutes</h1>
+
+  <div id="pkbox" hidden>
+    <button id="pkbtn" class="btn big" type="button">Sign in with a passkey</button>
+    <p id="pkerr" class="note err" hidden></p>
+    <p class="or">or</p>
+  </div>
+
+  <form method="post" action="/login/email">
+    <label for="email">Email me a sign-in link</label>
+    <input id="email" type="email" name="email" required autocomplete="email" placeholder="you@example.com">
+    <small class="help">Use the address the club has on its roster.</small>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn big" type="submit">Send link</button>
+  </form>
+
+  {% if sent %}<p class="note ok">If that address is on the club roster, a sign-in link is on its way. It works once, for 15 minutes.</p>{% endif %}
+  {% if error == 'link' %}<p class="note err">That sign-in link has expired or was already used. Request a new one above.</p>{% endif %}
+
+  <p class="muted small">Members only. If your email address has changed, ask a club officer to update the roster.</p>
+</div>
+<script src="/static/auth.js"></script>
+<script>
+if (passkeysSupported() && location.hostname === {{ rp_id|tojson }}) {
+  document.getElementById("pkbox").hidden = false;
+  document.getElementById("pkbtn").onclick = async () => {
+    const err = document.getElementById("pkerr"); err.hidden = true;
+    try { const r = await passkeySignIn({{ next|tojson }}); location.href = r.next || "/"; }
+    catch (e) { if (e.name !== "NotAllowedError") { err.textContent = e.message; err.hidden = false; } }
+  };
+}
+</script>
+{% endblock %}

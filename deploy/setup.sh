@@ -29,6 +29,14 @@ if [ ! -d "$APP/.git" ]; then
   sudo -u minutes git clone -q "$REPO" "$APP"
 fi
 
+# Admin command on the server, e.g. `w8lbz-minutes login-link KO4CGQ` or `w8lbz-minutes roster`
+cat > /usr/local/bin/w8lbz-minutes <<'WRAP'
+#!/bin/sh
+exec sudo -u minutes env W8LBZ_CONFIG=/etc/w8lbz-minutes/club.yaml W8LBZ_DATA=/var/lib/w8lbz-minutes \
+  W8LBZ_GOOGLE_KEY=/etc/w8lbz-minutes/google-service-account.json /opt/w8lbz-minutes/.venv/bin/w8lbz-minutes "$@"
+WRAP
+chmod 755 /usr/local/bin/w8lbz-minutes
+
 install -m 644 "$APP/deploy/w8lbz-minutes.service" "$APP/deploy/w8lbz-minutes-roster.service" \
   "$APP/deploy/w8lbz-minutes-roster.timer" /etc/systemd/system/
 systemctl daemon-reload
