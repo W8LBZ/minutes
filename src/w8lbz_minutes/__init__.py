@@ -11,6 +11,8 @@ def main() -> None:
     lk = sub.add_parser("login-link", help="print a one-time sign-in link for a member (admin recovery)")
     lk.add_argument("who", help="callsign, or the member's email")
     lk.add_argument("--base-url", help="defaults to https://<auth.rp_id>")
+    rm = sub.add_parser("delete-meeting", help="delete one meeting's minutes, e.g. after a test (restart the service afterwards)")
+    rm.add_argument("date", help="YYYY-MM-DD")
     srv = sub.add_parser("serve", help="run the web UI")
     srv.add_argument("--host", default="127.0.0.1")
     srv.add_argument("--port", type=int, default=8000)
@@ -34,6 +36,15 @@ def main() -> None:
             raise SystemExit(f"No active member matches {a.who!r}")
         print(f"Sign-in link for {auth.club.name(mid)} (one use, 15 minutes):")
         print(auth.create_link(mid, base_url=a.base_url))
+    elif a.cmd == "delete-meeting":
+        import datetime as dt
+        import shutil
+        from .club import MEETINGS
+        d = MEETINGS / dt.date.fromisoformat(a.date).isoformat()
+        if not (d / "minutes.md").exists():
+            raise SystemExit(f"No minutes for {a.date}")
+        shutil.rmtree(d)
+        print(f"Deleted {d}. Restart the web service so it drops it from memory.")
     elif a.cmd == "serve":
         import uvicorn
         uvicorn.run("w8lbz_minutes.web:app", host=a.host, port=a.port, reload=a.reload,

@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -224,7 +224,18 @@ def index(request: Request):
 def view(request: Request, slug: str):
     m = get_meeting(slug)
     has_original = (archive.root / slug / "original.pdf").exists()
-    return page(request, "meeting.html", m=m, has_original=has_original)
+    return page(request, "meeting.html", m=m, has_original=has_original,
+                emailed=console.email_status(archive, slug))
+
+
+def render_pdf(m) -> tuple[str, bytes]:
+    """(file name, PDF bytes) for submitted minutes."""
+    try:
+        from weasyprint import HTML
+    except OSError as e:  # missing system libraries (pango)
+        raise HTTPException(503, f"PDF rendering unavailable on this server: {e}")
+    html = templates.get_template("minutes_doc.html").render(m=m, pdf=True)
+    return f"{m.date.day}-{m.date:%b}-{m.date:%y}-minutes.pdf".lower(), HTML(string=html, base_url=str(HERE)).write_pdf()
 
 
 @app.get("/meetings/{slug}/minutes.pdf")
@@ -232,13 +243,7 @@ def pdf(request: Request, slug: str):
     m = get_meeting(slug)
     if m.status == "draft":
         raise HTTPException(409, "This meeting is still in progress; the PDF is available once the minutes are submitted.")
-    try:
-        from weasyprint import HTML
-    except OSError as e:  # missing system libraries (pango)
-        raise HTTPException(503, f"PDF rendering unavailable on this server: {e}")
-    html = templates.get_template("minutes_doc.html").render(m=m, pdf=True)
-    data = HTML(string=html, base_url=str(HERE)).write_pdf()
-    fname = f"{m.date.day}-{m.date:%b}-{m.date:%y}-minutes.pdf".lower()
+    fname, data = render_pdf(m)
     return Response(data, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
@@ -319,10 +324,15 @@ async def console_save(request: Request, slug: str, mid: str = Depends(leader)):
     return {"ok": True}
 
 
+def email_minutes(slug: str, url: str) -> None:
+    console.email_minutes(archive, slug, lambda: render_pdf(archive.by_slug[slug]), url)
+
+
 @app.post("/console/{slug}/submit")
-def console_submit(slug: str, mid: str = Depends(leader)):
+def console_submit(request: Request, background: BackgroundTasks, slug: str, mid: str = Depends(leader)):
     get_meeting(slug)
     console.submit(archive, slug)
+    background.add_task(email_minutes, slug, f"{base_url(request)}/meetings/{slug}")
     return RedirectResponse(f"/meetings/{slug}", status_code=303)
 
 

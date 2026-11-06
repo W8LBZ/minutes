@@ -235,36 +235,44 @@ def _safe_next(url: str) -> str:
     return url if url.startswith("/") and not url.startswith("//") else "/"
 
 
-def send_email(to: str, subject: str, body: str, attachments: list[tuple[str, bytes, str]] = (),
-               only_to: set[str] | None = None) -> bool:
+def send_email(to: str | list[str], subject: str, body: str, attachments: list[tuple[str, bytes, str]] = (),
+               only_to: set[str] | None = None, reply_to: str | None = None) -> int:
     """Send through SMTP (Gmail by default) using W8LBZ_SMTP_* environment variables.
 
-    `only_to` is the test-mode allowlist (club.yaml email.only_to): anything addressed to
-    someone else is withheld. Without SMTP credentials, the message is logged instead.
-    Returns True if the message was sent.
+    `to` is one address or a list; each recipient gets their own copy. `only_to` is the
+    test-mode allowlist (club.yaml email.only_to): anyone else is withheld. Without SMTP
+    credentials, messages are logged instead. Returns how many messages were sent.
     """
-    if only_to is not None and to.strip().lower() not in only_to:
-        log.warning("email test mode: withheld %r to a recipient not in email.only_to", subject)
-        return False
+    recipients = [to] if isinstance(to, str) else list(to)
+    if only_to is not None:
+        allowed = [r for r in recipients if r.strip().lower() in only_to]
+        if len(allowed) < len(recipients):
+            log.warning("email test mode: withheld %r from %d recipient(s) not in email.only_to",
+                        subject, len(recipients) - len(allowed))
+        recipients = allowed
+    if not recipients:
+        return 0
     user = os.environ.get("W8LBZ_SMTP_USER")
     password = (os.environ.get("W8LBZ_SMTP_PASSWORD") or "").replace(" ", "")  # Google shows app passwords in groups
     if not (user and password):
-        log.warning("SMTP not configured; email to %s not sent:\n%s\n%s", to, subject, body)
-        return False
-    msg = EmailMessage()
-    msg["From"] = os.environ.get("W8LBZ_SMTP_FROM", f"W8LBZ <{user}>")
-    msg["To"] = to
-    msg["Subject"] = subject
-    if os.environ.get("W8LBZ_SMTP_REPLY_TO"):
-        msg["Reply-To"] = os.environ["W8LBZ_SMTP_REPLY_TO"]
-    msg.set_content(body)
-    for name, data, mime in attachments:
-        maintype, subtype = mime.split("/", 1)
-        msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
+        log.warning("SMTP not configured; email to %s not sent:\n%s\n%s", ", ".join(recipients), subject, body)
+        return 0
+    reply_to = reply_to or os.environ.get("W8LBZ_SMTP_REPLY_TO")
     host, port = os.environ.get("W8LBZ_SMTP_HOST", "smtp.gmail.com"), int(os.environ.get("W8LBZ_SMTP_PORT", "587"))
     with smtplib.SMTP(host, port, timeout=30) as s:
         s.starttls()
         s.login(user, password)
-        s.send_message(msg)
-    log.info("email %r sent", subject)
-    return True
+        for r in recipients:
+            msg = EmailMessage()
+            msg["From"] = os.environ.get("W8LBZ_SMTP_FROM", f"W8LBZ <{user}>")
+            msg["To"] = r
+            msg["Subject"] = subject
+            if reply_to:
+                msg["Reply-To"] = reply_to
+            msg.set_content(body)
+            for name, data, mime in attachments:
+                maintype, subtype = mime.split("/", 1)
+                msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
+            s.send_message(msg)
+    log.info("email %r sent to %d recipient(s)", subject, len(recipients))
+    return len(recipients)
