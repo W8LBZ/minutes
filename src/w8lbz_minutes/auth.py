@@ -23,7 +23,7 @@ from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
 from webauthn.helpers.structs import (AuthenticatorSelectionCriteria, PublicKeyCredentialDescriptor,
                                       ResidentKeyRequirement, UserVerificationRequirement)
 
-from .club import DATA, Club
+from .club import DATA, PREVIEW, Club
 
 log = logging.getLogger("w8lbz.auth")
 
@@ -270,6 +270,18 @@ def _safe_next(url: str) -> str:
     return url if url.startswith("/") and not url.startswith("//") else "/"
 
 
+def _preview_outbox(recipients, subject, body, attachments, only_to, reply_to) -> int:
+    """Preview mode: record the email (and who test mode would withhold it from) instead of sending."""
+    allowed = [r for r in recipients if only_to is None or r.strip().lower() in only_to]
+    entry = {"at": int(time.time()), "to": allowed, "withheld": [r for r in recipients if r not in allowed],
+             "subject": subject, "body": body, "reply_to": reply_to, "attachments": [a[0] for a in attachments]}
+    p = DATA / "preview-outbox.jsonl"
+    with p.open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+    log.info("preview: email %r recorded in the outbox, not sent", subject)
+    return len(allowed)
+
+
 def send_email(to: str | list[str], subject: str, body: str, attachments: list[tuple[str, bytes, str]] = (),
                only_to: set[str] | None = None, reply_to: str | None = None) -> int:
     """Send through SMTP (Gmail by default) using W8LBZ_SMTP_* environment variables.
@@ -279,6 +291,8 @@ def send_email(to: str | list[str], subject: str, body: str, attachments: list[t
     credentials, messages are logged instead. Returns how many messages were sent.
     """
     recipients = [to] if isinstance(to, str) else list(to)
+    if PREVIEW:
+        return _preview_outbox(recipients, subject, body, attachments, only_to, reply_to)
     if only_to is not None:
         allowed = [r for r in recipients if r.strip().lower() in only_to]
         if len(allowed) < len(recipients):

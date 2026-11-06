@@ -17,7 +17,7 @@ from markupsafe import Markup, escape
 
 from . import console, profile
 from .auth import Auth, _safe_next
-from .club import DATA
+from .club import DATA, PREVIEW
 from .roster import SHAREABLE, SheetError
 from .meeting import SECTIONS
 from .store import Archive
@@ -68,7 +68,7 @@ def monthday(md: str | None) -> str:
 
 templates.env.filters["monthday"] = monthday
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
-templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"))
+templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"), PREVIEW=PREVIEW)
 
 
 # ---------------- login gate ----------------
@@ -466,6 +466,16 @@ def about(request: Request):
         text = re.sub(r"## Unreleased\s*(?=## )", "", changes.read_text())  # hide an empty Unreleased section
         changelog = Markup(markdown.markdown(text[text.find("\n## "):]))
     return page(request, "about.html", deps=dependencies(), changelog=changelog, license=_license("w8lbz-minutes"))
+
+
+@app.get("/preview/outbox", response_class=HTMLResponse)
+def preview_outbox(request: Request):
+    """Preview mode only: the emails the app would have sent."""
+    p = DATA / "preview-outbox.jsonl"
+    if not PREVIEW:
+        raise HTTPException(404)
+    mail = [json.loads(line) for line in p.read_text().splitlines()][::-1] if p.exists() else []
+    return page(request, "outbox.html", mail=mail)
 
 
 @app.get("/links", response_class=HTMLResponse)

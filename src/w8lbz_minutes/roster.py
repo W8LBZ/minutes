@@ -19,7 +19,7 @@ import os
 import re
 from pathlib import Path
 
-from .club import ROOT, ROSTER_CACHE as CACHE
+from .club import DATA, PREVIEW, ROOT, ROSTER_CACHE as CACHE
 
 KEY_FILE = Path(os.environ.get("W8LBZ_GOOGLE_KEY", ROOT / "private" / "google-service-account.json"))
 
@@ -64,6 +64,8 @@ class Sheet:
     """Values-only read/write of the roster tab, for members' profile edits."""
 
     def __init__(self, session=None):
+        if session is None and PREVIEW:
+            session = PreviewSheet()
         if session is None:
             import google.auth.transport.requests as gr
             from google.oauth2 import service_account
@@ -71,7 +73,7 @@ class Sheet:
                 KEY_FILE, scopes=["https://www.googleapis.com/auth/spreadsheets"])
             session = gr.AuthorizedSession(creds)
         self.s = session
-        self.sid, self.tab = _sheet()
+        self.sid, self.tab = ("preview", "Member Roster") if PREVIEW else _sheet()
 
     def _url(self, rng: str = "") -> str:
         return f"https://sheets.googleapis.com/v4/spreadsheets/{self.sid}/values{rng}"
@@ -107,6 +109,47 @@ class Sheet:
         old = {f: row[header.index(f)] for f in changes}
         self.write({f"{_col(header.index(f))}{rows[0]}": v for f, v in changes.items() if old[f] != v})
         return old
+
+
+class PreviewSheet:
+    """Preview mode's stand-in for the Sheets API: a local grid (preview-sheet.json) built from the
+    roster cache, so profile edits can be tried without touching the real sheet."""
+    HEADER = ["callsign", "full_name", "email", "Phone", "Address", "Title(s)", "Status", "birthday", "share"]
+
+    def __init__(self):
+        self.path = DATA / "preview-sheet.json"
+        if not self.path.exists():
+            people = json.loads(CACHE.read_text()) if CACHE.exists() else []
+            rows = [[p.get("callsign") or "", f"{p['first']} {p['last']}", p.get("email") or "", p.get("phone") or "",
+                     p.get("address") or "", p.get("role") or "", p.get("status") or "Active", p.get("birthday") or "",
+                     ", ".join(p.get("share") or [])] for p in people]
+            self.path.write_text(json.dumps([self.HEADER] + rows))
+
+    class _Response:
+        def __init__(self, data=None):
+            self.data, self.status_code = data or {}, 200
+
+        def json(self):
+            return self.data
+
+        def raise_for_status(self):
+            pass
+
+    def get(self, url, params=None):
+        return self._Response({"values": json.loads(self.path.read_text())})
+
+    def post(self, url, json=None):
+        import json as j
+        grid = j.loads(self.path.read_text())
+        for d in json["data"]:
+            a1 = d["range"].split("!")[1]
+            col_letters = re.match(r"[A-Z]+", a1).group()
+            col = sum((ord(ch) - 64) * 26 ** i for i, ch in enumerate(reversed(col_letters))) - 1
+            row = int(a1[len(col_letters):]) - 1
+            grid[row] += [""] * (col + 1 - len(grid[row]))
+            grid[row][col] = d["values"][0][0]
+        self.path.write_text(j.dumps(grid))
+        return self._Response()
 
 
 def fetch_rows(tab: str | None = None) -> list[dict[str, str]]:

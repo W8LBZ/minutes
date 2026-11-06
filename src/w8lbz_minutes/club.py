@@ -18,6 +18,9 @@ ROOT = Path(os.environ.get("W8LBZ_ROOT", Path(__file__).resolve().parents[2]))
 DATA = Path(os.environ.get("W8LBZ_DATA", ROOT / "data"))
 MEETINGS = DATA / "meetings"
 ROSTER_CACHE = DATA / "roster.json"
+# Preview mode (deploy/preview.sh): set to the branch name. Email goes to an outbox file instead of
+# SMTP, and roster edits go to a local copy of the sheet, never the real one.
+PREVIEW = os.environ.get("W8LBZ_PREVIEW") or None
 
 
 CALLSIGN = re.compile(r"^[A-Z]{1,2}\d[A-Z]{1,3}$", re.I)

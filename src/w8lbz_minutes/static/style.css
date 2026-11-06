@@ -64,3 +64,6 @@ svg.lock { width: .85em; height: .85em; vertical-align: -.05em; fill: #8a8f80; s
 div.change { white-space: pre-line; }
 .contactcard { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.2rem; } .contactcard dt { color: #667; }
 .contactcard dd { margin: 0; } .contactcard dd.address { white-space: pre-line; }
+.preview { background: #fff3c4; border-bottom: 1px solid #e0c96a; padding: .4rem 1rem; font-size: .9rem; text-align: center; }
+article.mail { border: 1px solid #d9dccf; border-radius: .4rem; padding: .6rem .9rem; margin: .8rem 0; background: #fff; }
+article.mail h3 { margin: .2rem 0; } article.mail pre { white-space: pre-wrap; font: inherit; font-size: .9rem; margin: .5rem 0 0; }

@@ -12,6 +12,7 @@
     <form method="post" action="/logout"><button type="submit">Sign out</button></form></div>
   </details>{% endif %}
 </nav>
+{% if PREVIEW %}<div class="preview">PREVIEW of <b>{{ PREVIEW }}</b>: a copy of the data. Emails aren't sent (see the <a href="/preview/outbox">outbox</a>) and roster edits don't reach the real sheet.</div>{% endif %}
 <main>{% block body %}{% endblock %}</main>
 <script src="/static/sort.js"></script>
 <script>  // close the name menu when clicking elsewhere
