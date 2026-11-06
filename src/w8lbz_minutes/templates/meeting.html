@@ -4,6 +4,7 @@
   {% if m.status != 'draft' %}<a class="btn" href="/meetings/{{ m.slug }}/minutes.pdf">Download PDF</a>{% endif %}
   {% if has_original %}<a class="btn ghost" href="/meetings/{{ m.slug }}/original.pdf">View original</a>{% endif %}
 </div>
+{% if can_lead and emailed %}<p class="muted">{% if emailed.error %}Emailing these minutes failed; see the server log.{% else %}Emailed {{ emailed.at|ts }} to {{ emailed.sent }} of {{ emailed.roster }} roster addresses{% if emailed.test_mode %} (test mode: email.only_to){% endif %}.{% endif %}</p>{% endif %}
 {% if m.status == 'draft' %}<p class="badge warn" style="display:inline-block">Meeting in progress: this page updates live</p>{% endif %}
 <div id="doc">{% include "_minutes.html" %}</div>
 {% if m.status == 'draft' %}<script>
