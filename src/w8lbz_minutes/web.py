@@ -16,6 +16,7 @@ from markupsafe import Markup, escape
 
 from . import console
 from .auth import Auth, _safe_next
+from .club import DATA
 from .meeting import SECTIONS
 from .store import Archive
 
@@ -307,6 +308,15 @@ def roster(request: Request):
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
     return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
                 active=sum(m.status.lower() not in gone for m in ms))
+
+
+@app.get("/bylaws", response_class=HTMLResponse)
+def bylaws(request: Request):
+    """The club's constitution and bylaws, from bylaws.md in the data directory (not in this public repo)."""
+    import markdown
+    p = DATA / "bylaws.md"
+    html = Markup(markdown.markdown(p.read_text())) if p.exists() else None
+    return page(request, "bylaws.html", html=html)
 
 
 @app.get("/stats", response_class=HTMLResponse)
