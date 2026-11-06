@@ -378,13 +378,18 @@ def search(request: Request, q: str = ""):
 def member(request: Request, mid: str):
     if mid not in archive.club.members:
         raise HTTPException(404)
-    return page(request, "member.html", member=archive.club.members[mid], h=archive.member_history(mid),
-                total=len(archive.meetings))
+    m, viewer, club = archive.club.members[mid], request.state.member, archive.club
+    values = {"email": (m.email, f"mailto:{m.email}"), "phone": (m.phone, f"tel:{m.phone}"),
+              "address": (m.address, None), "birthday": (monthday(m.birthday), None)}
+    # (field, value, link), with the value blank unless this viewer may see it (club.can_see)
+    contact = [(f, v if v and club.can_see(viewer, mid, f) else None, href) for f, (v, href) in values.items()]
+    return page(request, "member.html", member=m, h=archive.member_history(mid), total=len(archive.meetings),
+                contact=contact, is_me=viewer == mid, is_officer=club.members[viewer].officer)
 
 
 @app.get("/roster", response_class=HTMLResponse)
 def roster(request: Request):
-    """Members' details. Contact details only where the viewer may see them (club.can_see)."""
+    """Everyone on the roster; contact details are on each member's own page."""
     def since(m):
         try:
             return dt.date.fromisoformat(m.member_since) if m.member_since else None
@@ -392,11 +397,9 @@ def roster(request: Request):
             return None
     gone = ("inactive", "silent key")
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
-    viewer = request.state.member
     return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
                 active=sum(m.status.lower() not in gone for m in ms),
-                see=lambda m, f: archive.club.can_see(viewer, m.id, f),
-                is_officer=archive.club.members[viewer].officer)
+                is_officer=archive.club.members[request.state.member].officer)
 
 
 @app.get("/bylaws", response_class=HTMLResponse)

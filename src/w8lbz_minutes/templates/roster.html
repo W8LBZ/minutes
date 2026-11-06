@@ -1,17 +1,12 @@
 {% extends "base.html" %}{% block title %}Roster{% endblock %}{% block body %}
 <div class="headrow"><h1>Roster</h1>
 <p><a href="/profile">Edit your details and what you share</a>{% if is_officer %} · <a href="/roster/changes">Recent changes</a>{% endif %}</p></div>
-<p class="muted">{{ active }} active members. From the club roster sheet, synced daily.
-{% if is_officer %}As an officer you see everyone's contact details; {{ lock }} marks details the member hasn't shared with other members.{% else %}Contact details appear where members have chosen to share them.{% endif %}</p>
-{% set lock %}<svg class="lock" viewBox="0 0 24 24" aria-label="Only officers can see this" role="img"><title>Only officers can see this</title><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none"/></svg>{% endset %}
-{% macro detail(m, f, value) %}{% if value and see(m, f) %}<div>{{ value }}{% if f not in m.share %} {{ lock }}{% endif %}</div>{% endif %}{% endmacro %}
-<table class="list roster"><thead><tr><th>Name</th><th>Callsign</th><th>License</th><th>Office</th><th>Status</th><th>Member since</th><th>Contact</th><th>Birthday</th></tr></thead>
+<p class="muted">{{ active }} active members. From the club roster sheet, synced daily. Click a name for contact details{% if not is_officer %} the member has shared{% endif %} and their meeting history.</p>
+<table class="list"><thead><tr><th>Name</th><th>Callsign</th><th>License</th><th>Office</th><th>Status</th><th>Member since</th></tr></thead>
 <tbody>{% for m, since in rows %}<tr>
 <td data-sort="{{ m.last|lower }} {{ m.first|lower }}"><a href="/members/{{ m.id }}">{{ m.name }}</a></td><td class="cs">{{ m.callsign or '' }}</td>
 <td>{{ m.license_class or '' }}</td><td>{{ m.role or '' }}</td>
 <td>{% if m.status != 'Active' %}<span class="badge">{{ m.status }}</span>{% else %}Active{% endif %}</td>
 <td data-sort="{{ since or '' }}">{{ since|listdate if since }}</td>
-<td class="contact">{% if m.email and see(m, 'email') %}<div><a href="mailto:{{ m.email }}">{{ m.email }}</a>{% if 'email' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}{% if m.phone and see(m, 'phone') %}<div><a href="tel:{{ m.phone }}">{{ m.phone }}</a>{% if 'phone' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}{% if m.address and see(m, 'address') %}<div class="addr">{{ m.address }}{% if 'address' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}</td>
-<td data-sort="{{ m.birthday if m.birthday and see(m, 'birthday') else '' }}">{{ detail(m, 'birthday', m.birthday|monthday) }}</td>
 </tr>{% endfor %}</tbody></table>
 {% endblock %}

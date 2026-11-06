@@ -1,5 +1,16 @@
-{% extends "base.html" %}{% block body %}
+{% extends "base.html" %}{% from "_lock.html" import lock %}{% block body %}
 <h1>{{ member.name or member.last }}{% if member.callsign %} <span class="cs">{{ member.callsign }}</span>{% endif %}</h1>
+<p class="muted">{{ [member.license_class, member.role, member.status if member.status != 'Active']|select|join(' · ') }}</p>
+
+{% set shown = contact|selectattr(1)|list %}
+{% if shown or is_me %}<h2>Contact{% if is_me %} <a class="small" href="/profile">edit</a>{% endif %}</h2>
+<dl class="contactcard">{% for f, value, href in shown %}
+  <dt>{{ f|capitalize }}</dt><dd class="{{ f }}">{% if href %}<a href="{{ href }}">{{ value }}</a>{% else %}{{ value }}{% endif %}{% if f not in member.share %} {{ lock() }}{% endif %}</dd>
+{% endfor %}</dl>
+{% if is_me %}<p class="muted small">Officers can always see your details. {% if member.share %}Other members see: {{ member.share|join(', ') }}.{% else %}You haven't shared anything with other members.{% endif %}</p>
+{% elif is_officer and shown %}<p class="muted small">{{ lock() }} marks details {{ member.first }} hasn't shared with other members.</p>{% endif %}{% endif %}
+
+<h2>Meetings</h2>
 <p>Attended {{ h.present|length }} of {{ total }} meetings
 ({{ h.present|selectattr(1, 'eq', 'in person')|list|length }} in person,
 {{ h.present|selectattr(1, 'eq', 'online')|list|length }} online).
