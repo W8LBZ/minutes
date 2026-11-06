@@ -18,7 +18,34 @@ The chow rotation isn't part of the meeting itself, so it gets its own pages; th
   - Every change is kept in a history: who, when, and why.
 - **Reminders:** each member chooses on their account page whether and when to get an email reminder before their chow night (e.g. 3 days before, the day before, or off).
 - **In the leader console:** when starting a meeting, show whose chow night it is tonight and who's up next week.
+- **Calendar:** each chow slot is mirrored to the club's "Chow" Google Calendar, so swaps update it automatically.
+- **In the minutes:** the existing "Upcoming Chow" section (it says "See the attached chow list" when empty) links to, or is filled from, this schedule; the chow list goes out with the minutes email.
 - **Source of truth:** to be decided. Either the app's own data, exported to a sheet if wanted, or a tab in the roster Google Sheet. The swap and approval workflow favours the app.
+
+## Tracked business items
+Today, starting a meeting copies the last submitted meeting's Old and New Business into Old Business; it looks back only one meeting, so an item dropped once is gone for good.
+- **Each item is tracked** with an optional owner and due date, and stays in Old Business every week until it's marked Done (e.g. "contact the park about spring Field Day").
+- **Reminders:** the owner gets an email ahead of the due date; the console highlights overdue items.
+- **Scheduled agenda items:** an item can target a specific meeting (e.g. the President's "State of the Club"), and the console puts it on that night's agenda.
+
+## Club calendars
+The club's Google calendars ("Meetings & Events", "Chow", "Community Events", "Planning") aren't relied on yet; the app keeping them current would make them something members can trust.
+- **Meetings & Events:** the weekly meeting, plus dated club events from Upcoming Events.
+- **Chow:** written by the chow module (see above).
+- **Planning:** due dates of tracked business items.
+- **Community Events:** non-club happenings in the area; the app could show them, edited in Google Calendar.
+- The service account is added to each calendar with "Make changes to events"; the app only touches events it created.
+
+## Members and roster management
+The Google Sheet stays the source of truth; the app writes values back to it (values only, never formatting or structure).
+- **My profile:** members update their own phone, address and birthday, and choose for each whether it's shared with the club or visible to officers only.
+- **Celebrations:** birthdays (opt-in) and membership anniversaries shown in the console on meeting night ("Happy birthday, …", "5 years as a member").
+- **Officer history:** when someone starts or ends an office, recorded as Membership Log events, so the app can show who held each office when.
+- **Admin page for officers:** sync the roster now, email test mode on/off, delete test minutes, review imported minutes.
+
+## Bylaws
+- **Now:** a link in the app (Club Links) to the Google Doc version.
+- **Later:** the bylaws as text under version control, with each amendment tied to the meeting and motion that adopted it, and a history page showing what changed and when. Open question: members-only or public.
 
 ## Later
 - **Audio capture and live transcription** (see REQUIREMENTS.md §4.1–4.2): browser room capture plus a meeting bot, cloud speech-to-text, OpenRouter drafting.
