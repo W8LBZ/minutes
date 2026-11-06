@@ -319,6 +319,28 @@ def bylaws(request: Request):
     return page(request, "bylaws.html", html=html)
 
 
+LINK_ICONS = (("teams.", "video"), ("zoom.", "video"), ("meet.", "video"), ("discord.", "chat"),
+              ("/bylaws", "document"), ("docs.google.", "document"), (".pdf", "document"), ("calendar", "calendar"))
+
+
+def link_icon(url: str) -> str:
+    """Icon name for a club link, guessed from its address. In club.yaml a link can set `icon:` to one of
+    video, chat, globe, document, radio, calendar or link."""
+    u = url.lower()
+    return next((icon for key, icon in LINK_ICONS if key in u), "globe" if u.count("/") <= 3 else "link")
+
+
+templates.env.filters["link_icon"] = link_icon
+
+
+def link_host(url: str) -> str:
+    host = re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
+    return "on this site" if host == authn.rp_id else host
+
+
+templates.env.filters["link_host"] = link_host
+
+
 @app.get("/links", response_class=HTMLResponse)
 def links(request: Request):
     return page(request, "links.html")
