@@ -30,7 +30,9 @@ def linkify(text: str) -> Markup:
 
 
 templates.env.filters["linkify"] = linkify
-templates.env.filters["longdate"] = lambda d: f"{d:%A, %B} {d.day}, {d.year}"
+DATES = {"list": "%b %-d, %Y", "document": "%B %-d, %Y", **(archive.club.info.get("date_formats") or {})}
+templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
+templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
 templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS)
 
 
@@ -60,6 +62,8 @@ def view(request: Request, slug: str):
 @app.get("/meetings/{slug}/minutes.pdf")
 def pdf(request: Request, slug: str):
     m = get_meeting(slug)
+    if m.status == "draft":
+        raise HTTPException(409, "This meeting is still in progress; the PDF is available once the minutes are submitted.")
     try:
         from weasyprint import HTML
     except OSError as e:  # missing system libraries (pango)
@@ -81,7 +85,10 @@ def original(slug: str):
 
 @app.get("/search", response_class=HTMLResponse)
 def search(request: Request, q: str = ""):
-    return page(request, "search.html", q=q, results=archive.search(q) if q else [])
+    results = archive.search(q) if q else []
+    for r in results:
+        r["date"] = archive.by_slug[r["slug"]].date
+    return page(request, "search.html", q=q, results=results)
 
 
 @app.get("/members/{mid}", response_class=HTMLResponse)
