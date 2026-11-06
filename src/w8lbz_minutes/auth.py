@@ -115,8 +115,8 @@ class Auth:
             log.warning("login link rate limit hit for %s", member)
             return
         url = self.create_link(member, next_url, base_url)
-        send_email(self.club.members[member].email, "Your W8LBZ Minutes sign-in link",
-                   f"Hi {self.club.members[member].first},\n\n"
+        send_email(self.club.members[member].email, "Your W8LBZ Minutes sign-in link", only_to=self.club.email_only_to(),
+                   body=f"Hi {self.club.members[member].first},\n\n"
                    f"Use this link to sign in to W8LBZ Minutes. It works once, for {LINK_MINUTES} minutes:\n\n"
                    f"{url}\n\nIf you didn't ask for this, you can ignore this email.\n\n73,\nW8LBZ")
 
@@ -209,15 +209,22 @@ def _safe_next(url: str) -> str:
     return url if url.startswith("/") and not url.startswith("//") else "/"
 
 
-def send_email(to: str, subject: str, body: str, attachments: list[tuple[str, bytes, str]] = ()) -> None:
+def send_email(to: str, subject: str, body: str, attachments: list[tuple[str, bytes, str]] = (),
+               only_to: set[str] | None = None) -> bool:
     """Send through SMTP (Gmail by default) using W8LBZ_SMTP_* environment variables.
 
-    Without credentials (development), the message is written to the log instead.
+    `only_to` is the test-mode allowlist (club.yaml email.only_to): anything addressed to
+    someone else is withheld. Without SMTP credentials, the message is logged instead.
+    Returns True if the message was sent.
     """
-    user, password = os.environ.get("W8LBZ_SMTP_USER"), os.environ.get("W8LBZ_SMTP_PASSWORD")
+    if only_to is not None and to.strip().lower() not in only_to:
+        log.warning("email test mode: withheld %r to a recipient not in email.only_to", subject)
+        return False
+    user = os.environ.get("W8LBZ_SMTP_USER")
+    password = (os.environ.get("W8LBZ_SMTP_PASSWORD") or "").replace(" ", "")  # Google shows app passwords in groups
     if not (user and password):
         log.warning("SMTP not configured; email to %s not sent:\n%s\n%s", to, subject, body)
-        return
+        return False
     msg = EmailMessage()
     msg["From"] = os.environ.get("W8LBZ_SMTP_FROM", f"W8LBZ <{user}>")
     msg["To"] = to
@@ -233,3 +240,5 @@ def send_email(to: str, subject: str, body: str, attachments: list[tuple[str, by
         s.starttls()
         s.login(user, password)
         s.send_message(msg)
+    log.info("email %r sent", subject)
+    return True
