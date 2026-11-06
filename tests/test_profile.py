@@ -150,3 +150,18 @@ def test_monthday_filter():
     from w8lbz_minutes.web import monthday
     assert monthday("07-04") == "July 4" and monthday("") == "" and monthday(None) == ""
     assert monthday("1961-07-04") == "1961-07-04" and monthday("13-40") == "13-40"
+
+
+def test_club_reloads_roster_after_a_sync(tmp_path, monkeypatch):
+    import os
+    from w8lbz_minutes import club as club_mod
+    cache = tmp_path / "roster.json"
+    cache.write_text(json.dumps([{"id": "kd8ccc", "first": "Bob", "last": "Member"}]))
+    monkeypatch.setattr(club_mod, "ROSTER_CACHE", cache)
+    cfg = tmp_path / "club.yaml"
+    cfg.write_text("club: {name: T}\n")
+    c = club_mod.Club(cfg)
+    assert c.members["kd8ccc"].address is None and not c.refresh()
+    cache.write_text(json.dumps([{"id": "kd8ccc", "first": "Bob", "last": "Member", "address": "9 Oak Ave"}]))
+    os.utime(cache, (1, 2))  # a different mtime, as a sync would give
+    assert c.refresh() and c.members["kd8ccc"].address == "9 Oak Ave"

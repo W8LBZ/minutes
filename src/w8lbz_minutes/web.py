@@ -75,6 +75,7 @@ templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=versi
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
+    archive.club.refresh()  # pick up a roster sync without a restart
     request.state.member = authn.member_for(request.cookies.get(COOKIE))
     path = request.url.path
     if request.state.member or path.startswith(PUBLIC_PATHS):
