@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import re
 from pathlib import Path
 from urllib.parse import quote
@@ -24,6 +25,15 @@ app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 archive = Archive()
 authn = Auth(archive.club)
+
+# Show the app's own log lines (emails sent or withheld, rate limits) alongside uvicorn's.
+_log = logging.getLogger("w8lbz")
+if not _log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    _log.addHandler(_h)
+    _log.setLevel(logging.INFO)
+    _log.propagate = False
 
 COOKIE = "w8lbz_session"
 CHALLENGE_COOKIE = "w8lbz_pk"
@@ -145,6 +155,12 @@ def logout(request: Request):
 def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depends(me)):
     return page(request, "account.html", passkeys=authn.passkeys(mid), sessions=authn.sessions(mid),
                 welcome=welcome, next=_safe_next(next), passkey_host=request.url.hostname == authn.rp_id)
+
+
+@app.post("/account/passkeys/{pid}/rename")
+def rename_passkey(pid: str, label: str = Form(""), mid: str = Depends(me)):
+    authn.rename_passkey(mid, pid, label)
+    return RedirectResponse("/account", status_code=303)
 
 
 @app.post("/account/passkeys/{pid}/remove")

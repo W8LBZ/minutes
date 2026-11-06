@@ -102,3 +102,19 @@ def test_only_to_resolves_callsigns():
     assert club.email_only_to() == {"j@x.org", "other@y.org"}
     club.email = {}
     assert club.email_only_to() is None
+
+
+def test_rename_passkey_and_old_db_upgrade(a, tmp_path):
+    a.db.execute("insert into passkeys (id, member, public_key, sign_count, label, created) values ('p1','kd8aaa',x'00',0,'Windows PC',0)")
+    a.rename_passkey("kd8aaa", "p1", "  Bitwarden ")
+    a.rename_passkey("kd8bbb", "p1", "not mine")  # someone else's passkey: no effect
+    assert a.passkeys("kd8aaa")[0]["label"] == "Bitwarden"
+    # an auth.sqlite created before the aaguid column existed gets upgraded on start
+    import sqlite3
+    old = tmp_path / "old.sqlite"
+    con = sqlite3.connect(old)
+    con.executescript("create table passkeys (id text primary key, member text not null, public_key blob not null, "
+                      "sign_count integer not null, transports text, label text, created integer not null, last_used integer)")
+    con.close()
+    Auth(a.club, old)
+    assert "aaguid" in [r[1] for r in sqlite3.connect(old).execute("pragma table_info(passkeys)")]

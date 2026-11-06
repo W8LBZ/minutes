@@ -38,9 +38,3 @@ async function passkeyRegister(label) {
   const cred = await navigator.credentials.create({ publicKey: o });
   return post("/auth/passkey/register/verify", { credential: credToJSON(cred), label });
 }
-
-function guessDeviceLabel() {
-  const ua = navigator.userAgent;
-  return /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
-    : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows PC" : /Linux/.test(ua) ? "Linux PC" : "This device";
-}
