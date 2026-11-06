@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -215,9 +215,29 @@ async def passkey_login_verify(request: Request):
 
 # ---------------- archive ----------------
 
+PER_PAGE = 26  # meetings per archive page: about half a year
+
+
+def years() -> list[int]:
+    return sorted({m.date.year for m in archive.meetings}, reverse=True)
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    return page(request, "index.html", meetings=archive.meetings)
+def index(request: Request, year: int | None = None, p: int = Query(1, alias="page")):
+    """Meetings grouped by year, newest first. With ?year=, that year alone, PER_PAGE at a time."""
+    if year:
+        ms = [m for m in archive.meetings if m.date.year == year]
+        pages = max(1, -(-len(ms) // PER_PAGE))
+        p = min(max(p, 1), pages)
+        groups = [(year, ms[(p - 1) * PER_PAGE:p * PER_PAGE], len(ms))]
+    else:
+        pages = 1
+        groups = [(y, ms[:PER_PAGE], len(ms))
+                  for y in years() for ms in [[m for m in archive.meetings if m.date.year == y]]]
+    this_year = dt.date.today().year
+    open_year = year or (this_year if this_year in years() else next(iter(years()), None))
+    return page(request, "index.html", groups=groups, years=years(), year=year, open_year=open_year,
+                p=p, pages=pages)
 
 
 @app.get("/meetings/{slug}", response_class=HTMLResponse)
@@ -272,9 +292,31 @@ def member(request: Request, mid: str):
                 total=len(archive.meetings))
 
 
+@app.get("/roster", response_class=HTMLResponse)
+def roster(request: Request):
+    """Members' public-to-members details only: no phone, address or email."""
+    def since(m):
+        try:
+            return dt.date.fromisoformat(m.member_since) if m.member_since else None
+        except ValueError:
+            return None
+    gone = ("inactive", "silent key")
+    ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
+    return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
+                active=sum(m.status.lower() not in gone for m in ms))
+
+
 @app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request):
-    return page(request, "stats.html", s=archive.stats())
+def stats(request: Request, period: str = "12m"):
+    """Attendance for the last 12 months (default), all time, or one year."""
+    if period == "all":
+        ms, label = archive.meetings, "on record"
+    elif period.isdigit():
+        ms, label = [m for m in archive.meetings if m.date.year == int(period)], f"in {period}"
+    else:
+        period, cutoff = "12m", dt.date.today() - dt.timedelta(days=365)
+        ms, label = [m for m in archive.meetings if m.date > cutoff], "in the last 12 months"
+    return page(request, "stats.html", s=archive.stats(ms), period=period, label=label, years=years())
 
 
 @app.get("/guests", response_class=HTMLResponse)

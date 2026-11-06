@@ -1,6 +1,11 @@
 {% extends "base.html" %}{% block body %}
-<h1>Attendance</h1>
-<p>{{ s.count }} meetings on record, averaging {{ '%.1f'|format(s.avg) }} people per meeting (members and guests).</p>
+<div class="headrow"><h1>Attendance</h1>
+<form class="filter"><label>Period <select name="period" onchange="this.form.submit()">
+  <option value="12m" {{ 'selected' if period == '12m' }}>Last 12 months</option>
+  <option value="all" {{ 'selected' if period == 'all' }}>All time</option>
+  {% for y in years %}<option value="{{ y }}" {{ 'selected' if period == y|string }}>{{ y }}</option>{% endfor %}
+</select></label><noscript><button class="btn small">Show</button></noscript></form></div>
+<p>{{ s.count }} meeting{{ 's' if s.count != 1 }} {{ label }}, averaging {{ '%.1f'|format(s.avg) }} people per meeting (members and guests).</p>
 <div class="cols">
 <section><h2>Per meeting</h2>
 <table class="list"><thead><tr><th>Date</th><th class="n">In person</th><th class="n">Online</th><th class="n">Guests</th><th class="n">Total</th></tr></thead>
