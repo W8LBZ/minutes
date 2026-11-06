@@ -1,15 +1,18 @@
-"""Web UI: archive, minutes view and PDF, search, member history, stats, guests."""
+"""Web UI: archive, minutes view and PDF, search, member history, stats, guests, leader console."""
 from __future__ import annotations
 
+import datetime as dt
+import json
 import re
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
+from . import console
 from .meeting import SECTIONS
 from .store import Archive
 
@@ -97,3 +100,63 @@ def stats(request: Request):
 @app.get("/guests", response_class=HTMLResponse)
 def guests(request: Request):
     return page(request, "guests.html", guests=archive.guests())
+
+
+# ---------------- leader console ----------------
+# NOTE: no login yet (LAN only). Leaders are picked from the roster's officers + minutes_editor.
+
+@app.get("/console", response_class=HTMLResponse)
+def console_home(request: Request):
+    drafts = [m for m in archive.meetings if m.status == "draft"]
+    leaders = sorted(archive.club.leaders, key=archive.club.name)
+    return page(request, "console_start.html", drafts=drafts, leaders=leaders, today=dt.date.today())
+
+
+@app.post("/console/start")
+def console_start(date: str = Form(...), leader: str = Form("")):
+    m = console.start(archive, dt.date.fromisoformat(date), leader or None)
+    return RedirectResponse(f"/console/{m.slug}", status_code=303)
+
+
+@app.get("/console/{slug}", response_class=HTMLResponse)
+def console_page(request: Request, slug: str):
+    m = get_meeting(slug)
+    if m.status == "published":
+        return RedirectResponse(f"/meetings/{slug}", status_code=303)
+    ctx = console.context(archive, m)
+    return page(request, "console.html", m=m, data=json.dumps(ctx),
+                leaders=sorted(archive.club.leaders, key=archive.club.name))
+
+
+@app.put("/api/meetings/{slug}")
+async def console_save(request: Request, slug: str):
+    get_meeting(slug)
+    try:
+        console.apply(archive, slug, await request.json())
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True}
+
+
+@app.get("/api/meetings/{slug}/live", response_class=HTMLResponse)
+def live_fragment(request: Request, slug: str):
+    """The rendered minutes, for viewers following along (polled)."""
+    return templates.get_template("_minutes.html").render(m=get_meeting(slug), pdf=False, club=archive.club,
+                                                          SECTIONS=SECTIONS)
+
+
+@app.post("/console/{slug}/submit")
+def console_submit(slug: str):
+    get_meeting(slug)
+    console.submit(archive, slug)
+    return RedirectResponse(f"/meetings/{slug}", status_code=303)
+
+
+@app.post("/console/{slug}/discard")
+def console_discard(slug: str):
+    get_meeting(slug)
+    try:
+        console.discard(archive, slug)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return RedirectResponse("/console", status_code=303)

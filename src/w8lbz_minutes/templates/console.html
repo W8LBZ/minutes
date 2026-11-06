@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}Console {{ m.date }}{% endblock %}{% block body %}
+<link rel="stylesheet" href="/static/console.css">
+<div class="ch">
+  <div><h1>Meeting of {{ m.date|longdate }}</h1>
+  Led by <select id="leader">{% for id in leaders %}<option value="{{ id }}" {{ 'selected' if id == m.leader }}>{{ club.name(id) }}</option>{% endfor %}</select>
+  · <a href="/meetings/{{ m.slug }}" target="_blank">viewer link</a></div>
+  <div id="saved" class="saved">Saved</div>
+</div>
+<nav id="steps" class="steps"></nav>
+<section id="panel"></section>
+<div class="pager"><button id="prev" class="btn ghost">◀ Back</button><button id="next" class="btn">Next ▶</button></div>
+<form id="submitform" method="post" action="/console/{{ m.slug }}/submit"></form>
+<form method="post" action="/console/{{ m.slug }}/discard" onsubmit="return confirm('Discard this draft completely? This cannot be undone.')" style="text-align:right">
+  <button class="btn small ghost" type="submit">Discard draft</button></form>
+<script>window.CONSOLE = {{ data|safe }};</script>
+<script src="/static/console.js"></script>
+{% endblock %}

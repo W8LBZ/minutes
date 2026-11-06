@@ -56,14 +56,14 @@ class Archive:
         return [dict(slug=s, section=sec, member=mem, snippet=snip) for s, sec, mem, snip in cur]
 
     def member_history(self, mid: str) -> dict:
-        present = [(m, "in person" if mid in m.in_person else "Teams")
+        present = [(m, "in person" if mid in m.in_person else "online")
                    for m in self.meetings if mid in m.in_person or mid in m.remote]
         reports = [(m, it) for m in self.meetings for it in m.items("Community Reports") if it.member == mid]
         return {"present": present, "reports": reports}
 
     def stats(self) -> dict:
         rows = [{"meeting": m, "in_person": len(m.in_person), "remote": len(m.remote),
-                 "guests": len(m.guests), "total": m.attendance + len(m.guests)}
+                 "guests": len(m.guests) + m.visitors, "total": m.attendance + len(m.guests) + m.visitors}
                 for m in self.meetings]
         per_member = defaultdict(lambda: {"in_person": 0, "remote": 0, "last": None})
         for m in self.meetings:

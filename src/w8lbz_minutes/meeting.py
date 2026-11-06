@@ -44,6 +44,7 @@ class Meeting:
     in_person: list[str] = field(default_factory=list)
     remote: list[str] = field(default_factory=list)
     guests: list[dict] = field(default_factory=list)  # {name, callsign}
+    visitors: int = 0  # guests counted but not named (e.g. family, minors)
     sections: dict[str, list[Item]] = field(default_factory=dict)
 
     @property
@@ -68,8 +69,9 @@ class Meeting:
             "note": self.note,
             "attendance": {"in_person": self.in_person, "remote": self.remote},
             "guests": self.guests,
+            "visitors": self.visitors,
         }
-        fm = {k: v for k, v in fm.items() if v not in (None, [], {})}
+        fm = {k: v for k, v in fm.items() if v not in (None, [], {}, 0)}
         out = ["---", yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).strip(), "---", ""]
         for name in SECTIONS:
             out.append(f"## {name}")
@@ -94,6 +96,7 @@ class Meeting:
             in_person=att.get("in_person") or [],
             remote=att.get("remote") or [],
             guests=fm.get("guests") or [],
+            visitors=fm.get("visitors", 0),
         )
         current = None
         for line in body.splitlines():
