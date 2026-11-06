@@ -8,7 +8,11 @@
 <h2>Passkeys</h2>
 {% if passkeys %}<table class="list"><thead><tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr></thead><tbody>
 {% for p in passkeys %}<tr><td><form method="post" action="/account/passkeys/{{ p.id }}/rename" class="rename">
-  <input name="label" value="{{ p.label or 'Passkey' }}" maxlength="60" aria-label="Passkey name"><button class="btn small ghost">Rename</button></form></td><td>{{ p.created|ts }}</td><td>{{ p.last_used|ts }}</td>
+  <span class="pkname">{{ p.label or 'Passkey' }}</span>
+  <button type="button" class="btn small ghost edit" title="Rename this passkey">Edit</button>
+  <input name="label" value="{{ p.label or 'Passkey' }}" data-orig="{{ p.label or 'Passkey' }}" maxlength="60" aria-label="Passkey name" hidden>
+  <button type="submit" class="btn small save" hidden>Save</button>
+  <button type="button" class="btn small ghost cancel" hidden>Cancel</button></form></td><td>{{ p.created|ts }}</td><td>{{ p.last_used|ts }}</td>
 <td><form method="post" action="/account/passkeys/{{ p.id }}/remove" onsubmit="return confirm('Remove this passkey?')"><button class="btn small ghost">Remove</button></form></td></tr>{% endfor %}
 </tbody></table><p class="muted small">Name each passkey after where it's saved (e.g. "Bitwarden" or "Jim's phone") so you know which to remove if you lose a device.</p>
 {% else %}<p class="muted">No passkeys yet. You sign in with an emailed link.</p>{% endif %}
@@ -29,6 +33,16 @@
 </div>
 <script src="/static/auth.js"></script>
 <script>
+// Passkey names: read-only until "Edit"; "Save" appears only once the name changes.
+document.querySelectorAll("form.rename").forEach((f) => {
+  const [name, edit, input, save, cancel] = ["pkname", "edit", "input", "save", "cancel"].map((c) => f.querySelector(c === "input" ? "input" : "." + c));
+  const editing = (on) => { name.hidden = edit.hidden = on; input.hidden = cancel.hidden = !on; save.hidden = true;
+    if (on) { input.focus(); input.select(); } else input.value = input.dataset.orig; };
+  edit.onclick = () => editing(true);
+  cancel.onclick = () => editing(false);
+  input.oninput = () => { save.hidden = !input.value.trim() || input.value.trim() === input.dataset.orig; };
+  input.onkeydown = (e) => { if (e.key === "Escape") editing(false); };
+});
 const add = document.getElementById("pkadd");
 if (add) {
   if (passkeysSupported()) {
