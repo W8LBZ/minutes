@@ -17,3 +17,14 @@ table.list { border-collapse: collapse; width: 100%; } .list th, .list td { padd
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; } @media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
 .cs { font-family: monospace; }
 th.asc::after { content: " ▲"; } th.desc::after { content: " ▼"; }
+.login { max-width: 26rem; margin: 2rem auto; text-align: center; }
+.login .loginlogo { width: 96px; }
+.login form { display: flex; flex-direction: column; gap: .6rem; text-align: left; }
+.login label { display: flex; flex-direction: column; gap: .3rem; font-weight: 600; }
+.login input[type=email] { font: inherit; padding: .5rem; border: 1px solid #ccd; border-radius: .3rem; font-weight: normal; }
+.login button { font: inherit; } .btn.big { width: 100%; padding: .8rem; font-size: 1.05rem; border: 0; cursor: pointer; }
+.or { color: #889; margin: .8rem 0; } .small { font-size: .85rem; }
+.msg { padding: .6rem .8rem; border-radius: .3rem; text-align: left; } .msg.ok { background: #e6f1d8; } .msg.err { background: #f7dcd4; }
+nav.top .me { background: #4a5d2e; padding: .15rem .6rem; border-radius: 1rem; }
+button.btn { border: 0; cursor: pointer; font: inherit; } .btn.small { padding: .2rem .55rem; font-size: .85rem; }
+.row { display: flex; gap: .5rem; flex-wrap: wrap; }

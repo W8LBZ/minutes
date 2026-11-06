@@ -1,18 +1,20 @@
-"""Web UI: archive, minutes view and PDF, search, member history, stats, guests, leader console."""
+"""Web UI: archive, minutes view and PDF, search, member history, stats, guests, leader console, login."""
 from __future__ import annotations
 
 import datetime as dt
 import json
 import re
 from pathlib import Path
+from urllib.parse import quote
 
-from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
 from . import console
+from .auth import Auth, _safe_next
 from .meeting import SECTIONS
 from .store import Archive
 
@@ -21,7 +23,11 @@ app = FastAPI(title="W8LBZ Minutes")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 archive = Archive()
+authn = Auth(archive.club)
 
+COOKIE = "w8lbz_session"
+CHALLENGE_COOKIE = "w8lbz_pk"
+PUBLIC_PATHS = ("/login", "/auth/passkey/login/", "/static/", "/favicon.ico")
 URL_RE = re.compile(r"(https?://[^\s<]+[^\s<.,)])")
 
 
@@ -29,21 +35,68 @@ def linkify(text: str) -> Markup:
     return Markup(URL_RE.sub(r'<a href="\1">\1</a>', str(escape(text))))
 
 
-templates.env.filters["linkify"] = linkify
-DATES = {"list": "%b %-d, %Y", "document": "%B %-d, %Y", **(archive.club.info.get("date_formats") or {})}
-templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
-templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
 def by_last_name(ids):
     c = archive.club
     return sorted(ids, key=lambda i: (c.members[i].last, c.members[i].first) if i in c.members else (i, ""))
 
 
+DATES = {"list": "%b %-d, %Y", "document": "%B %-d, %Y", **(archive.club.info.get("date_formats") or {})}
+templates.env.filters["linkify"] = linkify
+templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
+templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
 templates.env.filters["by_last_name"] = by_last_name
+templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS)
 
 
+# ---------------- login gate ----------------
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    request.state.member = authn.member_for(request.cookies.get(COOKIE))
+    path = request.url.path
+    if request.state.member or path.startswith(PUBLIC_PATHS):
+        return await call_next(request)
+    if request.method == "GET" and not path.startswith("/api/"):
+        target = path + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(f"/login?next={quote(target)}", status_code=303)
+    return JSONResponse({"detail": "Please sign in"}, status_code=401)
+
+
+def me(request: Request) -> str:
+    return request.state.member
+
+
+def leader(request: Request) -> str:
+    if not archive.club.can_lead(request.state.member):
+        raise HTTPException(403, "Only officers and minutes editors can lead a meeting.")
+    return request.state.member
+
+
 def page(request: Request, name: str, **ctx) -> HTMLResponse:
-    return templates.TemplateResponse(request, name, ctx)
+    mid = getattr(request.state, "member", None)
+    return templates.TemplateResponse(request, name, {
+        "me": archive.club.members.get(mid) if mid else None,
+        "can_lead": archive.club.can_lead(mid) if mid else False,
+        "rp_id": authn.rp_id, **ctx})
+
+
+def is_https(request: Request) -> bool:
+    # Behind `tailscale serve` the app itself sees plain HTTP; the passkey host is always HTTPS.
+    return request.url.scheme == "https" or request.url.hostname == authn.rp_id
+
+
+def base_url(request: Request) -> str:
+    """Where this member reached us (LAN address or the HTTPS tailnet name), for links in emails."""
+    host = request.headers.get("host", request.url.netloc)
+    return f"{'https' if is_https(request) else 'http'}://{host}"
+
+
+def start_session(request: Request, response: Response, member: str) -> Response:
+    token = authn.new_session(member, request.headers.get("user-agent", ""))
+    response.set_cookie(COOKIE, token, max_age=authn.session_days * 86400, httponly=True, samesite="lax",
+                        secure=is_https(request))
+    return response
 
 
 def get_meeting(slug: str):
@@ -52,6 +105,99 @@ def get_meeting(slug: str):
         raise HTTPException(404, "No minutes for that date")
     return m
 
+
+# ---------------- login & account ----------------
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, next: str = "/", sent: int = 0, error: str = ""):
+    if request.state.member:
+        return RedirectResponse(_safe_next(next), status_code=303)
+    return page(request, "login.html", next=_safe_next(next), sent=sent, error=error)
+
+
+@app.post("/login/email")
+def login_email(request: Request, email: str = Form(...), next: str = Form("/")):
+    authn.send_link(email, next, base_url=base_url(request))
+    return RedirectResponse(f"/login?sent=1&next={quote(_safe_next(next))}", status_code=303)
+
+
+@app.get("/login/link")
+def login_link(request: Request, t: str = ""):
+    used = authn.use_link(t)
+    if not used:
+        return RedirectResponse("/login?error=link", status_code=303)
+    member, next_url = used
+    # Offer a passkey right away to members who don't have one (only possible over HTTPS on the passkey host).
+    if not authn.passkeys(member) and request.url.hostname == authn.rp_id:
+        next_url = f"/account?welcome=1&next={quote(next_url)}"
+    return start_session(request, RedirectResponse(next_url, status_code=303), member)
+
+
+@app.post("/logout")
+def logout(request: Request):
+    authn.end_session(request.cookies.get(COOKIE))
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(COOKIE)
+    return response
+
+
+@app.get("/account", response_class=HTMLResponse)
+def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depends(me)):
+    return page(request, "account.html", passkeys=authn.passkeys(mid), sessions=authn.sessions(mid),
+                welcome=welcome, next=_safe_next(next), passkey_host=request.url.hostname == authn.rp_id)
+
+
+@app.post("/account/passkeys/{pid}/remove")
+def remove_passkey(pid: str, mid: str = Depends(me)):
+    authn.remove_passkey(mid, pid)
+    return RedirectResponse("/account", status_code=303)
+
+
+@app.post("/account/sessions/end-all")
+def end_all_sessions(mid: str = Depends(me)):
+    authn.end_all_sessions(mid)
+    return RedirectResponse("/login", status_code=303)
+
+
+@app.post("/auth/passkey/register/options")
+def passkey_register_options(request: Request, mid: str = Depends(me)):
+    cid, options = authn.registration_options(mid)
+    response = Response(options, media_type="application/json")
+    response.set_cookie(CHALLENGE_COOKIE, cid, max_age=300, httponly=True, samesite="strict", secure=True)
+    return response
+
+
+@app.post("/auth/passkey/register/verify")
+async def passkey_register_verify(request: Request, mid: str = Depends(me)):
+    body = await request.json()
+    try:
+        authn.register(mid, request.cookies.get(CHALLENGE_COOKIE), body["credential"], body.get("label", ""))
+    except Exception as e:  # verification errors come from several exception types
+        raise HTTPException(400, f"Couldn't add the passkey: {e}")
+    return {"ok": True}
+
+
+@app.post("/auth/passkey/login/options")
+def passkey_login_options():
+    cid, options = authn.authentication_options()
+    response = Response(options, media_type="application/json")
+    response.set_cookie(CHALLENGE_COOKIE, cid, max_age=300, httponly=True, samesite="strict", secure=True)
+    return response
+
+
+@app.post("/auth/passkey/login/verify")
+async def passkey_login_verify(request: Request):
+    body = await request.json()
+    try:
+        member = authn.authenticate(request.cookies.get(CHALLENGE_COOKIE), body["credential"])
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    if not authn.is_active(member):
+        raise HTTPException(403, "Your roster entry isn't active.")
+    return start_session(request, JSONResponse({"ok": True, "next": _safe_next(body.get("next", "/"))}), member)
+
+
+# ---------------- archive ----------------
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
@@ -115,24 +261,30 @@ def guests(request: Request):
     return page(request, "guests.html", guests=archive.guests())
 
 
-# ---------------- leader console ----------------
-# NOTE: no login yet (LAN only). Leaders are picked from the roster's officers + minutes_editor.
+@app.get("/api/meetings/{slug}/live", response_class=HTMLResponse)
+def live_fragment(request: Request, slug: str):
+    """The rendered minutes, for members following along (polled)."""
+    return templates.get_template("_minutes.html").render(m=get_meeting(slug), pdf=False, club=archive.club,
+                                                          SECTIONS=SECTIONS)
+
+
+# ---------------- leader console (officers + minutes editors) ----------------
 
 @app.get("/console", response_class=HTMLResponse)
-def console_home(request: Request):
+def console_home(request: Request, mid: str = Depends(leader)):
     drafts = [m for m in archive.meetings if m.status == "draft"]
     leaders = sorted(archive.club.leaders, key=archive.club.name)
     return page(request, "console_start.html", drafts=drafts, leaders=leaders, today=dt.date.today())
 
 
 @app.post("/console/start")
-def console_start(date: str = Form(...), leader: str = Form("")):
-    m = console.start(archive, dt.date.fromisoformat(date), leader or None)
+def console_start(date: str = Form(...), leader_id: str = Form("", alias="leader"), mid: str = Depends(leader)):
+    m = console.start(archive, dt.date.fromisoformat(date), leader_id or mid)
     return RedirectResponse(f"/console/{m.slug}", status_code=303)
 
 
 @app.get("/console/{slug}", response_class=HTMLResponse)
-def console_page(request: Request, slug: str):
+def console_page(request: Request, slug: str, mid: str = Depends(leader)):
     m = get_meeting(slug)
     if m.status == "published":
         return RedirectResponse(f"/meetings/{slug}", status_code=303)
@@ -142,7 +294,7 @@ def console_page(request: Request, slug: str):
 
 
 @app.put("/api/meetings/{slug}")
-async def console_save(request: Request, slug: str):
+async def console_save(request: Request, slug: str, mid: str = Depends(leader)):
     get_meeting(slug)
     try:
         console.apply(archive, slug, await request.json())
@@ -151,22 +303,15 @@ async def console_save(request: Request, slug: str):
     return {"ok": True}
 
 
-@app.get("/api/meetings/{slug}/live", response_class=HTMLResponse)
-def live_fragment(request: Request, slug: str):
-    """The rendered minutes, for viewers following along (polled)."""
-    return templates.get_template("_minutes.html").render(m=get_meeting(slug), pdf=False, club=archive.club,
-                                                          SECTIONS=SECTIONS)
-
-
 @app.post("/console/{slug}/submit")
-def console_submit(slug: str):
+def console_submit(slug: str, mid: str = Depends(leader)):
     get_meeting(slug)
     console.submit(archive, slug)
     return RedirectResponse(f"/meetings/{slug}", status_code=303)
 
 
 @app.post("/console/{slug}/discard")
-def console_discard(slug: str):
+def console_discard(slug: str, mid: str = Depends(leader)):
     get_meeting(slug)
     try:
         console.discard(archive, slug)
