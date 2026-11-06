@@ -223,8 +223,11 @@ def years() -> list[int]:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, year: int | None = None, p: int = Query(1, alias="page")):
+def index(request: Request, year: str = "", p: str = Query("1", alias="page")):
     """Meetings grouped by year, newest first. With ?year=, that year alone, PER_PAGE at a time."""
+    # The "All years" option sends year= (empty); anything that isn't a number means all years.
+    year = int(year) if year.isdigit() else None
+    p = int(p) if p.isdigit() else 1
     if year:
         ms = [m for m in archive.meetings if m.date.year == year]
         pages = max(1, -(-len(ms) // PER_PAGE))

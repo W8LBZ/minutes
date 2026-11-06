@@ -112,6 +112,9 @@ def test_archive_groups_by_year_and_pages(client):
     p1, p2 = client.get("/?year=2024").text, client.get("/?year=2024&page=2").text
     assert rows(p1) == 26 and rows(p2) == 4 and "Page 2 of 2" in p2
     assert rows(client.get("/?year=2024&page=99").text) == 4  # clamped to the last page
+    for junk in ("/?year=", "/?year=abc", "/?year=2024&page=x"):  # "All years" sends year= (empty)
+        r = client.get(junk)
+        assert r.status_code == 200 and "<details" in r.text
 
 
 def test_stats_periods(client):
