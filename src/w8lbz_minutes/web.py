@@ -58,6 +58,7 @@ templates.env.filters["linkify"] = linkify
 templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
 templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
 templates.env.filters["by_last_name"] = by_last_name
+templates.env.filters["clock"] = lambda t: dt.datetime.fromtimestamp(t).strftime("%-I:%M %p")
 def monthday(md: str | None) -> str:
     """'07-04' -> 'July 4'. Anything else (e.g. a full date typed into the sheet) is shown as is."""
     try:
@@ -77,6 +78,7 @@ templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=versi
 async def require_login(request: Request, call_next):
     archive.club.refresh()  # pick up a roster sync without a restart
     request.state.member = authn.member_for(request.cookies.get(COOKIE))
+    request.state.admin_until = authn.admin_until(request.cookies.get(COOKIE)) if request.state.member else None
     path = request.url.path
     if request.state.member or path.startswith(PUBLIC_PATHS):
         return await call_next(request)
@@ -90,24 +92,34 @@ def me(request: Request) -> str:
     return request.state.member
 
 
+def admin_mode(request: Request) -> bool:
+    return bool(getattr(request.state, "admin_until", None))
+
+
+def privileged(request: Request) -> bool:
+    """Officers, and admins while admin mode is on: see all contact details, the change log, undo."""
+    m = archive.club.members.get(getattr(request.state, "member", None) or "")
+    return bool(m and (m.officer or admin_mode(request)))
+
+
 def leader(request: Request) -> str:
-    if not archive.club.can_lead(request.state.member):
+    if not (archive.club.can_lead(request.state.member) or admin_mode(request)):
         raise HTTPException(403, "Only officers and minutes editors can lead a meeting.")
     return request.state.member
 
 
 def officer(request: Request) -> str:
-    m = archive.club.members.get(request.state.member)
-    if not (m and m.officer):
+    if not privileged(request):
         raise HTTPException(403, "Only officers can do that.")
-    return m.id
+    return request.state.member
 
 
 def page(request: Request, name: str, **ctx) -> HTMLResponse:
     mid = getattr(request.state, "member", None)
     return templates.TemplateResponse(request, name, {
         "me": archive.club.members.get(mid) if mid else None,
-        "can_lead": archive.club.can_lead(mid) if mid else False,
+        "can_lead": (archive.club.can_lead(mid) or admin_mode(request)) if mid else False,
+        "is_admin": archive.club.is_admin(mid), "admin_until": getattr(request.state, "admin_until", None),
         "rp_id": authn.rp_id, **ctx})
 
 
@@ -175,6 +187,26 @@ def logout(request: Request):
 def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depends(me)):
     return page(request, "account.html", passkeys=authn.passkeys(mid), sessions=authn.sessions(mid),
                 welcome=welcome, next=_safe_next(next), passkey_host=request.url.hostname == authn.rp_id)
+
+
+# ---------------- admin mode ----------------
+ADMIN_MINUTES = 60
+
+
+@app.post("/admin/mode")
+def admin_mode_switch(request: Request, on: int = Form(0), next: str = Form("/"), mid: str = Depends(me)):
+    """Admins turn admin mode on (for ADMIN_MINUTES) or off for this sign-in. Every switch is logged."""
+    if not archive.club.is_admin(mid):
+        raise HTTPException(403, "You aren't listed as an admin.")
+    until = authn.set_admin(request.cookies.get(COOKIE), ADMIN_MINUTES if on else 0)
+    entry = {"at": int(dt.datetime.now().timestamp()), "member": mid, "on": bool(on), "until": until,
+             "ip": request.client.host if request.client else None}
+    p = DATA / "admin-log.jsonl"
+    with p.open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+    p.chmod(0o600)
+    _log.info("admin mode %s for %s", "on" if on else "off", mid)
+    return RedirectResponse(_safe_next(next), status_code=303)
 
 
 # ---------------- profile (own contact details and sharing) ----------------
@@ -382,9 +414,10 @@ def member(request: Request, mid: str):
     values = {"email": (m.email, f"mailto:{m.email}"), "phone": (m.phone, f"tel:{m.phone}"),
               "address": (m.address, None), "birthday": (monthday(m.birthday), None)}
     # (field, value, link), with the value blank unless this viewer may see it (club.can_see)
-    contact = [(f, v if v and club.can_see(viewer, mid, f) else None, href) for f, (v, href) in values.items()]
+    elevated = admin_mode(request)
+    contact = [(f, v if v and club.can_see(viewer, mid, f, elevated) else None, href) for f, (v, href) in values.items()]
     return page(request, "member.html", member=m, h=archive.member_history(mid), total=len(archive.meetings),
-                contact=contact, is_me=viewer == mid, is_officer=club.members[viewer].officer)
+                contact=contact, is_me=viewer == mid, is_officer=privileged(request))
 
 
 @app.get("/roster", response_class=HTMLResponse)
@@ -399,7 +432,7 @@ def roster(request: Request):
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
     return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
                 active=sum(m.status.lower() not in gone for m in ms),
-                is_officer=archive.club.members[request.state.member].officer)
+                is_officer=privileged(request))
 
 
 @app.get("/bylaws", response_class=HTMLResponse)

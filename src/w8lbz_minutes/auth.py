@@ -84,13 +84,15 @@ class Auth:
         cols = {r["name"] for r in self.db.execute("pragma table_info(passkeys)")}
         if "aaguid" not in cols:  # added after the first release
             self.db.execute("alter table passkeys add column aaguid text")
+        if "admin_until" not in {r["name"] for r in self.db.execute("pragma table_info(sessions)")}:
+            self.db.execute("alter table sessions add column admin_until integer")
         os.chmod(path, 0o600)
 
     # ---------------- sessions ----------------
     def new_session(self, member: str, agent: str = "") -> str:
         token = secrets.token_urlsafe(32)
         now = int(time.time())
-        self.db.execute("insert into sessions values (?,?,?,?,?)",
+        self.db.execute("insert into sessions (token_hash, member, created, expires, agent) values (?,?,?,?,?)",
                         (_hash(token), member, now, now + self.session_days * 86400, agent[:200]))
         return token
 
@@ -106,6 +108,25 @@ class Auth:
     def is_active(self, member: str) -> bool:
         m = self.club.members.get(self.club.canonical(member))
         return bool(m and m.status.lower() not in ("inactive", "silent key"))
+
+    # ---------------- admin mode (per sign-in, time-limited) ----------------
+    def admin_until(self, token: str | None) -> int | None:
+        """When this sign-in's admin mode ends, or None if it's off."""
+        if not token:
+            return None
+        row = self.db.execute("select member, admin_until from sessions where token_hash=?", (_hash(token),)).fetchone()
+        if not row or not row["admin_until"] or row["admin_until"] < time.time() or not self.club.is_admin(row["member"]):
+            return None
+        return row["admin_until"]
+
+    def set_admin(self, token: str, minutes: int) -> int | None:
+        """Turn admin mode on for `minutes` (0 turns it off). Only for members listed as admins."""
+        row = self.db.execute("select member from sessions where token_hash=?", (_hash(token),)).fetchone()
+        if not row or not self.club.is_admin(row["member"]):
+            return None
+        until = int(time.time()) + minutes * 60 if minutes else None
+        self.db.execute("update sessions set admin_until=? where token_hash=?", (until, _hash(token)))
+        return until
 
     def end_session(self, token: str | None) -> None:
         if token:

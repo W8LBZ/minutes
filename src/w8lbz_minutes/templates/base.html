@@ -9,9 +9,13 @@
   <form action="/search"><input name="q" type="search" placeholder="Search all minutes…" value="{{ q or '' }}"></form>
   <details class="menu"><summary class="me">{{ me.short or me.first }} ▾</summary>
     <div class="drop"><a href="/profile">Your profile</a><a href="/account">Sign-in &amp; passkeys</a><a href="/about">About</a>
+    {% if is_admin %}<form method="post" action="/admin/mode"><input type="hidden" name="on" value="{{ 0 if admin_until else 1 }}"><input type="hidden" name="next" value="{{ request.url.path }}">
+      <button type="submit">{{ 'Turn off admin mode' if admin_until else 'Turn on admin mode' }}</button></form>{% endif %}
     <form method="post" action="/logout"><button type="submit">Sign out</button></form></div>
   </details>{% endif %}
 </nav>
+{% if admin_until %}<div class="adminbar">Admin mode is on until {{ admin_until|clock }}: you can see and change what officers can.
+<form method="post" action="/admin/mode"><input type="hidden" name="on" value="0"><input type="hidden" name="next" value="{{ request.url.path }}"><button type="submit">Turn off</button></form></div>{% endif %}
 {% if PREVIEW %}<div class="preview">PREVIEW of <b>{{ PREVIEW }}</b>: a copy of the data. Emails aren't sent (see the <a href="/preview/outbox">outbox</a>) and roster edits don't reach the real sheet.</div>{% endif %}
 <main>{% block body %}{% endblock %}</main>
 <script src="/static/sort.js"></script>

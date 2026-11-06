@@ -76,9 +76,10 @@ def test_change_writes_only_changed_cells_and_tells_the_secretary(env):
     assert (m.address, m.birthday, m.share) == ("9 Oak Ave", "07-04", ["phone", "birthday"])
     cached = {r["id"]: r for r in json.loads((profile.ROSTER_CACHE).read_text())}
     assert cached["kd8ccc"]["address"] == "9 Oak Ave"
-    (to, subject, body, kw), = sent
+    (to, subject, body, kw), (to2, subject2, body2, kw2) = sent
     assert to == ["jane@example.org"] and "Bob Member" in subject and "9 Oak Ave" in body and "https://x/roster/changes" in body
-    assert "only_to" in kw  # email test mode applies
+    assert to2 == ["bob@example.org"] and "You updated" in body2 and "9 Oak Ave" in body2  # the member is told too
+    assert "only_to" in kw and "only_to" in kw2  # email test mode applies
     assert profile.change(club, "kd8ccc", {"address": "9 Oak Ave"}, by="kd8ccc", sheet=sheet) is None  # no-op
 
 
@@ -210,3 +211,40 @@ def test_preview_mode_never_sends_or_touches_the_real_sheet(tmp_path, monkeypatc
     sheet = Sheet()
     assert sheet.update_member("KD8CCC", "Bob Member", {"phone": "419-555-0111"}) == {"phone": ""}
     assert "419-555-0111" in (tmp_path / "preview-sheet.json").read_text()
+
+
+def test_email_change_alerts_old_and_new_address(env):
+    club, sheet, fake, sent = env
+    profile.change(club, "kd8ccc", {"email": "bob@new.example"}, by="kd8ccc", sheet=sheet)
+    assert sent[-1][0] == ["bob@new.example", "bob@example.org"]
+
+
+def test_admin_mode(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    from w8lbz_minutes.auth import Auth
+    from w8lbz_minutes.store import Archive
+    club = Club(FIX / "test-club.yaml", roster=[
+        {"id": "ko4cgq", "first": "Jim", "last": "F", "callsign": "KO4CGQ"},
+        {"id": "kd8ccc", "first": "Bob", "last": "Member", "phone": "419-555-0199"}])
+    club.admins = {"ko4cgq"}
+    a = Auth(club, tmp_path / "auth.sqlite")
+    monkeypatch.setattr(web, "archive", Archive(root=tmp_path, club=club))
+    monkeypatch.setattr(web, "authn", a)
+    monkeypatch.setattr(web, "DATA", tmp_path)
+    c = TestClient(web.app)
+    c.cookies.set(web.COOKIE, a.new_session("ko4cgq"))
+    assert "419-555-0199" not in c.get("/members/kd8ccc").text          # off by default: an ordinary member
+    assert c.get("/roster/changes").status_code == 403
+    assert "Turn on admin mode" in c.get("/links").text
+    c.post("/admin/mode", data={"on": 1, "next": "/links"})
+    page = c.get("/members/kd8ccc").text
+    assert "419-555-0199" in page and "Admin mode is on" in page          # on: officer-level view
+    assert c.get("/roster/changes").status_code == 200
+    c.post("/admin/mode", data={"on": 0})
+    assert c.get("/roster/changes").status_code == 403
+    assert [e["on"] for e in map(json.loads, (tmp_path / "admin-log.jsonl").read_text().splitlines())] == [True, False]
+
+    c.cookies.set(web.COOKIE, a.new_session("kd8ccc"))                    # not an admin: can't turn it on
+    assert c.post("/admin/mode", data={"on": 1}).status_code == 403
+    assert "Turn on admin mode" not in c.get("/links").text

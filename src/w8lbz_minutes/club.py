@@ -66,6 +66,7 @@ class Club:
         self.auth = cfg.get("auth") or {}
         self.email = cfg.get("email") or {}
         self.redact = [_n(x) for x in (cfg.get("privacy") or {}).get("never_record", [])]
+        self.admins = {str(x).lower() for x in cfg.get("admins") or []}  # may turn on admin mode (callsign ids)
 
         self._mtime = None  # set when the people come from the roster cache, so refresh() can notice a sync
         if roster is None and "members" in cfg:  # inline members (tests, example config)
@@ -134,10 +135,14 @@ class Club:
 
     can_edit = can_lead
 
-    def can_see(self, viewer: str | None, mid: str, fld: str) -> bool:
-        """Contact details: officers and the member always; other members only what was shared."""
+    def is_admin(self, mid: str | None) -> bool:
+        """Listed under admins: in club.yaml. Admin rights apply only while admin mode is on."""
+        return bool(mid) and mid in self.admins
+
+    def can_see(self, viewer: str | None, mid: str, fld: str, elevated: bool = False) -> bool:
+        """Contact details: officers, admins in admin mode, and the member always; others only what was shared."""
         v, m = self.members.get(viewer or ""), self.members.get(mid)
-        return bool(m and v and (v.officer or v.id == m.id or fld in m.share))
+        return bool(m and v and (v.officer or elevated or v.id == m.id or fld in m.share))
 
     @property
     def secretaries(self) -> list[str]:
