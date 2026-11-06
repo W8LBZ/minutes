@@ -5,6 +5,7 @@ import pytest
 from w8lbz_minutes.club import Club
 from w8lbz_minutes.importer import file_date, parse
 from w8lbz_minutes.meeting import Meeting
+from w8lbz_minutes.store import Archive
 
 FIX = Path(__file__).parent / "fixtures"
 club = Club(FIX / "test-club.yaml")
@@ -67,3 +68,19 @@ def test_membership_log():
                     {"callsign": "", "full_name": "Old Timer", "date": "", "event": "Silent Key"}])
     assert ms[0]["officer"] and ms[0]["member_since"] == "2026-01-21"
     assert ms[1]["id"] == "old-timer" and ms[1]["events"][0]["event"] == "Silent Key"
+
+
+def test_roster_page_shows_no_contact_details(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    c = Club(FIX / "test-club.yaml", roster=[
+        {"id": "kd8aaa", "first": "Jane", "last": "Doe", "callsign": "KD8AAA", "email": "jane@example.org",
+         "license_class": "Extra", "role": "Secretary", "officer": True, "member_since": "2024-03-07"},
+        {"id": "kd8bbb", "first": "Old", "last": "Timer", "status": "Silent Key", "member_since": "not a date"}])
+    monkeypatch.setattr(web, "archive", Archive(tmp_path, c))
+    monkeypatch.setattr(web.templates.env, "globals", {**web.templates.env.globals, "club": c})
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "kd8aaa")
+    html = TestClient(web.app).get("/roster").text
+    assert "KD8AAA" in html and "Secretary" in html and "Mar 7, 2024" in html and "Silent Key" in html
+    assert "jane@example.org" not in html
+    assert html.index("Doe") < html.index("Timer")
