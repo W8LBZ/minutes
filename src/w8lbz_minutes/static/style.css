@@ -33,3 +33,4 @@ th.asc::after { content: " ▲"; } th.desc::after { content: " ▼"; }
 nav.top .me { background: #4a5d2e; padding: .15rem .6rem; border-radius: 1rem; }
 button.btn { border: 0; cursor: pointer; font: inherit; } .btn.small { padding: .2rem .55rem; font-size: .85rem; }
 .row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.rename { display: flex; gap: .4rem; } .rename input { font: inherit; padding: .2rem .4rem; border: 1px solid #ccd; border-radius: .3rem; min-width: 10rem; }
