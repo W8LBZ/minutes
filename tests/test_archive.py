@@ -43,3 +43,27 @@ def test_ambiguous_first_name():
 def test_file_date():
     assert str(file_date("29-jan-26-minutes-R1JCmreIiha6nmwZ.pdf")) == "2026-01-29"
     assert str(file_date("10-sept-26-minutes.pdf")) == "2026-09-10"
+
+
+def test_permissions_and_possessives():
+    assert club.can_lead("doe") and not club.can_lead("kim")
+    assert club.speaker_of("Sams antenna fell down") == "kim"
+
+
+def test_former_callsign_maps_to_member(tmp_path, m):
+    from w8lbz_minutes.store import Archive
+    m.in_person = ["doe", "kd8old"]  # stored before Sam's callsign change
+    m.save(tmp_path)
+    a = Archive(tmp_path, club)
+    assert a.meetings[0].in_person == ["doe", "kim"]
+    assert club.members["kim"].aliases == []  # not treated as a name spelling
+
+
+def test_membership_log():
+    from w8lbz_minutes.roster import attach_log, to_members
+    ms = to_members([{"full_name": "Sam Kim", "callsign": "KD8NEW", "is_officer": "True"},
+                     {"full_name": "Old Timer", "status": "Silent Key"}])
+    attach_log(ms, [{"callsign": "KD8NEW", "date": "46043", "event": "Joined"},
+                    {"callsign": "", "full_name": "Old Timer", "date": "", "event": "Silent Key"}])
+    assert ms[0]["officer"] and ms[0]["member_since"] == "2026-01-21"
+    assert ms[1]["id"] == "old-timer" and ms[1]["events"][0]["event"] == "Silent Key"

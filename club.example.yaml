@@ -12,12 +12,11 @@ links:  # shown in the "Club Links" footer of the minutes
   - label: Club Discord
     url: https://discord.com/invite/REPLACE_ME
 
-leaders: [doe]     # may lead a meeting
-editors: [roe]     # standing trusted editors
+roster:  # the club roster Google Sheet (share it with the service account as Viewer)
+  sheet_id: REPLACE_ME
+  tab: Member Roster
 
 privacy:
   never_record: []  # names never shown in minutes or the archive
 
-members:
-  doe: {first: Jane, last: Doe, short: Jane D, callsign: KD8XYZ, role: Secretary}
-  roe: {first: Rick, last: Roe, aliases: [Rowe]}
+# People come only from the roster Google Sheet (`w8lbz-minutes roster`).
