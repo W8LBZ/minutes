@@ -34,3 +34,8 @@ nav.top .me { background: #4a5d2e; padding: .15rem .6rem; border-radius: 1rem; }
 button.btn { border: 0; cursor: pointer; font: inherit; } .btn.small { padding: .2rem .55rem; font-size: .85rem; }
 .row { display: flex; gap: .5rem; flex-wrap: wrap; }
 .rename { display: flex; gap: .4rem; align-items: center; } .rename .pkname { min-width: 8rem; } .rename input { font: inherit; padding: .2rem .4rem; border: 1px solid #ccd; border-radius: .3rem; min-width: 10rem; }
+.headrow { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.filter select { font: inherit; padding: .2rem .4rem; }
+details.year { margin: .5rem 0 1rem; } details.year > summary { cursor: pointer; font-size: 1.2rem; font-weight: 600; padding: .3rem 0; }
+details.year > summary .muted { font-size: .9rem; font-weight: normal; }
+.pager { display: flex; gap: .75rem; align-items: center; }
