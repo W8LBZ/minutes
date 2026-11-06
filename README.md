@@ -59,3 +59,7 @@ When a leader submits the minutes, the PDF goes to every roster member with an e
 
 ## Bylaws
 `/bylaws` shows the club's constitution and bylaws from `bylaws.md` in the data directory (`/var/lib/w8lbz-minutes/bylaws.md` on the server). It's kept out of this public repo.
+
+## Changes and releases
+- Each PR adds a line under "Unreleased" in `CHANGELOG.md`, and removes its item from `ROADMAP.md` if it finishes one.
+- To release: rename "Unreleased" to the new version and date, bump `version` in `pyproject.toml` (then `uv lock`), merge, and tag the merge commit (`git tag v0.3.0 && git push origin v0.3.0`). Deploy with `update.sh`; the footer then shows the new version.
