@@ -70,7 +70,7 @@ article.mail h3 { margin: .2rem 0; } article.mail pre { white-space: pre-wrap; f
 .adminbar { background: #8b1d1d; color: #fff; padding: .4rem 1rem; font-size: .9rem; text-align: center; }
 .adminbar form { display: inline; margin-left: .6rem; } .adminbar button { font: inherit; font-size: .85rem; padding: .1rem .6rem; border-radius: .3rem; border: 1px solid #fff; background: transparent; color: #fff; cursor: pointer; }
 table.chow tr.mine td { background: #eef2e6; } table.chow tr.none td { color: #889; } table.chow td { vertical-align: middle; }
-table.chow td.actions { text-align: right; } table.chow td.actions details.edit[open] { text-align: left; }
+table.chow td.chowact { text-align: right; } table.chow td.chowact details.edit[open] { text-align: left; }
 form.inline { display: inline-flex; gap: .3rem; align-items: center; margin: .15rem .2rem; flex-wrap: wrap; } form.inline select, form.inline input { font: inherit; padding: .15rem; }
 details.edit { display: inline-block; text-align: left; } details.edit > summary { cursor: pointer; color: #556; font-size: .85rem; }
 details.edit[open] { display: block; background: #f6f8f1; border: 1px solid #d9dccf; border-radius: .4rem; padding: .4rem .6rem; margin: .3rem 0; }

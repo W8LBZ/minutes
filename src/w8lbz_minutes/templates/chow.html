@@ -23,7 +23,7 @@
   <td>{% if x.status == 'none' %}<span class="muted">No chow{% if x.note %} ({{ x.note }}){% endif %}</span>
       {% elif x.member %}<a href="/members/{{ x.member }}">{{ club.name(x.member) }}</a>{% if x.member == me.id %} <span class="badge">you</span>{% endif %}
       {% else %}<span class="muted">(open)</span>{% endif %}</td>
-  <td class="actions">
+  <td class="chowact">
     {% if x.member and x.member != me.id and mine and x.status != 'none' %}
     <form method="post" action="/chow/request" class="inline"><input type="hidden" name="theirs" value="{{ d }}">
       <select name="mine" aria-label="Your night to give">{% for md in mine %}<option value="{{ md }}">my {{ fmt(md) }}</option>{% endfor %}</select>
