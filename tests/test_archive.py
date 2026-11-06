@@ -174,6 +174,6 @@ def test_about_page(monkeypatch):
     monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
     c = TestClient(web.app)
     html = c.get("/about").text
-    assert web.version("w8lbz-minutes") in html and "Jim Flattery, KO4CGQ" in html
+    assert web.version("w8lbz-minutes") in html and "Jim Flattery, KO4CGQ" in html and "AGPL-3.0-or-later" in html
     assert ">fastapi<" in html.lower() and "What's new" in html
     assert 'href="/about"' in c.get("/links").text  # in the name menu on every page

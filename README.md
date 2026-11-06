@@ -63,3 +63,10 @@ When a leader submits the minutes, the PDF goes to every roster member with an e
 ## Changes and releases
 - Each PR adds a line under "Unreleased" in `CHANGELOG.md`, and removes its item from `ROADMAP.md` if it finishes one.
 - To release: rename "Unreleased" to the new version and date, bump `version` in `pyproject.toml` (then `uv lock`), merge, and tag the merge commit (`git tag v0.3.0 && git push origin v0.3.0`). Deploy with `update.sh`; the footer then shows the new version.
+
+## License
+Copyright © 2026 Jim Flattery, KO4CGQ.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See [LICENSE](LICENSE).
+
+If you run a modified version for others over a network, you must offer them its source code (AGPL section 13). The About page's source link does this for the club's copy.
