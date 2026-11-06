@@ -279,6 +279,8 @@ def link_icon(url: str) -> str:
 
 
 templates.env.filters["link_icon"] = link_icon
+
+
 def link_host(url: str) -> str:
     host = re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
     return "on this site" if host == authn.rp_id else host
