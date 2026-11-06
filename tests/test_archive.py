@@ -136,3 +136,15 @@ def test_guests_page_moves_new_members_to_their_own_section(tmp_path, monkeypatc
     current, joined = html.split("<h2>Became members")
     assert "Pat Guest" in current and "Rick Roe" not in current
     assert "Rick Roe" in joined and "Oct 15, 2026" in joined and "after 2.0 visits" in joined
+
+
+def test_bylaws_page(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    monkeypatch.setattr(web, "DATA", tmp_path)
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    c = TestClient(web.app)
+    assert "haven't been added yet" in c.get("/bylaws").text
+    (tmp_path / "bylaws.md").write_text("# Constitution\n\n### Article I\n\n**A.** Meetings <b>weekly</b>.")
+    html = c.get("/bylaws").text
+    assert "<h1>Constitution</h1>" in html and "<strong>A.</strong>" in html
