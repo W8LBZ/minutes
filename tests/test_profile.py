@@ -189,3 +189,24 @@ def test_multiline_addresses_keep_their_line_breaks(env, monkeypatch):
     c.post("/profile", data=form, follow_redirects=False)
     assert fake.rows[2][4] == "100 Main St #13\nAnytown, OH 44000"
     assert "#13 / Anytown" in sent[-1][2]  # readable in the Secretary's email
+
+
+def test_preview_mode_never_sends_or_touches_the_real_sheet(tmp_path, monkeypatch):
+    from w8lbz_minutes import auth as auth_mod
+    monkeypatch.setattr(auth_mod, "PREVIEW", "some-branch")
+    monkeypatch.setattr(auth_mod, "DATA", tmp_path)
+    monkeypatch.setattr(auth_mod.smtplib, "SMTP", lambda *a, **k: (_ for _ in ()).throw(AssertionError("SMTP used")))
+    monkeypatch.setenv("W8LBZ_SMTP_USER", "u")
+    monkeypatch.setenv("W8LBZ_SMTP_PASSWORD", "p")
+    assert auth_mod.send_email(["a@x.org", "b@x.org"], "Hi", "body", only_to={"a@x.org"}) == 1
+    e = json.loads((tmp_path / "preview-outbox.jsonl").read_text())
+    assert e["to"] == ["a@x.org"] and e["withheld"] == ["b@x.org"] and e["subject"] == "Hi"
+
+    monkeypatch.setattr(roster, "PREVIEW", "some-branch")
+    monkeypatch.setattr(roster, "DATA", tmp_path)
+    monkeypatch.setattr(roster, "CACHE", tmp_path / "roster.json")
+    monkeypatch.setattr(roster, "_sheet", lambda: (_ for _ in ()).throw(AssertionError("real sheet used")))
+    (tmp_path / "roster.json").write_text(json.dumps([{"id": "kd8ccc", "first": "Bob", "last": "Member", "callsign": "KD8CCC"}]))
+    sheet = Sheet()
+    assert sheet.update_member("KD8CCC", "Bob Member", {"phone": "419-555-0111"}) == {"phone": ""}
+    assert "419-555-0111" in (tmp_path / "preview-sheet.json").read_text()
