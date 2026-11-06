@@ -15,9 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import console
+from . import console, profile
 from .auth import Auth, _safe_next
 from .club import DATA
+from .roster import SHAREABLE, SheetError
 from .meeting import SECTIONS
 from .store import Archive
 
@@ -57,6 +58,15 @@ templates.env.filters["linkify"] = linkify
 templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
 templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
 templates.env.filters["by_last_name"] = by_last_name
+def monthday(md: str | None) -> str:
+    """'07-04' -> 'July 4'. Anything else (e.g. a full date typed into the sheet) is shown as is."""
+    try:
+        return dt.date(2000, int(md[:2]), int(md[3:5])).strftime("%B %-d") if md and len(md) == 5 else (md or "")
+    except ValueError:
+        return md
+
+
+templates.env.filters["monthday"] = monthday
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"))
 
@@ -65,6 +75,7 @@ templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=versi
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
+    archive.club.refresh()  # pick up a roster sync without a restart
     request.state.member = authn.member_for(request.cookies.get(COOKIE))
     path = request.url.path
     if request.state.member or path.startswith(PUBLIC_PATHS):
@@ -83,6 +94,13 @@ def leader(request: Request) -> str:
     if not archive.club.can_lead(request.state.member):
         raise HTTPException(403, "Only officers and minutes editors can lead a meeting.")
     return request.state.member
+
+
+def officer(request: Request) -> str:
+    m = archive.club.members.get(request.state.member)
+    if not (m and m.officer):
+        raise HTTPException(403, "Only officers can do that.")
+    return m.id
 
 
 def page(request: Request, name: str, **ctx) -> HTMLResponse:
@@ -157,6 +175,73 @@ def logout(request: Request):
 def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depends(me)):
     return page(request, "account.html", passkeys=authn.passkeys(mid), sessions=authn.sessions(mid),
                 welcome=welcome, next=_safe_next(next), passkey_host=request.url.hostname == authn.rp_id)
+
+
+# ---------------- profile (own contact details and sharing) ----------------
+
+def clean_address(text: str) -> str:
+    """Keep the member's line breaks (the sheet stores addresses on several lines); tidy spaces and blank lines."""
+    lines = [" ".join(line.split()) for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return "\n".join(line for line in lines if line)[:200]
+
+
+@app.get("/profile", response_class=HTMLResponse)
+def profile_page(request: Request, saved: int = 0, email_sent: str = "", error: str = "", mid: str = Depends(me)):
+    return page(request, "profile.html", m=archive.club.members[mid], shareable=SHAREABLE,
+                saved=saved, email_sent=email_sent, error=error)
+
+
+@app.post("/profile")
+async def profile_save(request: Request, mid: str = Depends(me)):
+    form = await request.form()
+    m = archive.club.members[mid]
+    address = clean_address(form.get("address", ""))
+    if address == clean_address(m.address or ""):  # untouched: don't rewrite the sheet over spacing
+        address = m.address or ""
+    try:
+        bm, bd = int(form.get("bmonth") or 0), int(form.get("bday") or 0)
+        birthday = f"{bm:02d}-{bd:02d}" if bm and bd and dt.date(2000, bm, bd) else ""
+    except ValueError:
+        return RedirectResponse("/profile?error=" + quote("That birthday isn't a real date."), status_code=303)
+    new = {"phone": form.get("phone", "").strip()[:40], "address": address, "birthday": birthday,
+           "share": ", ".join(f for f in SHAREABLE if f in form.getlist("share"))}
+    try:
+        profile.change(archive.club, mid, new, by=mid, url=base_url(request))
+    except SheetError as e:
+        return RedirectResponse("/profile?error=" + quote(str(e)), status_code=303)
+    email = form.get("email", "").strip()
+    if email and email.lower() != (m.email or "").lower():
+        err = authn.start_email_change(mid, email, base_url(request))
+        if err:
+            return RedirectResponse("/profile?saved=1&error=" + quote(err), status_code=303)
+        return RedirectResponse("/profile?saved=1&email_sent=" + quote(email), status_code=303)
+    return RedirectResponse("/profile?saved=1", status_code=303)
+
+
+@app.get("/profile/email")
+def profile_email_confirm(request: Request, t: str = "", mid: str = Depends(me)):
+    got = authn.confirm_email_change(t)
+    if not got or got[0] != mid:
+        return RedirectResponse("/profile?error=" + quote("That confirmation link is invalid or expired."), status_code=303)
+    try:
+        profile.change(archive.club, mid, {"email": got[1]}, by=mid, url=base_url(request))
+    except SheetError as e:
+        return RedirectResponse("/profile?error=" + quote(str(e)), status_code=303)
+    return RedirectResponse("/profile?saved=1", status_code=303)
+
+
+@app.get("/roster/changes", response_class=HTMLResponse)
+def roster_changes(request: Request, error: str = "", mid: str = Depends(officer)):
+    return page(request, "changes.html", changes=profile.history(), labels=profile.LABELS, error=error)
+
+
+@app.post("/roster/changes/{cid}/undo")
+def roster_change_undo(request: Request, cid: str, mid: str = Depends(officer)):
+    try:
+        profile.undo(archive.club, cid, by=mid, url=base_url(request))
+    except (ValueError, SheetError) as e:
+        return RedirectResponse("/roster/changes?error=" + quote(str(e)), status_code=303)
+    return RedirectResponse("/roster/changes", status_code=303)
 
 
 @app.post("/account/passkeys/{pid}/rename")
@@ -293,13 +378,18 @@ def search(request: Request, q: str = ""):
 def member(request: Request, mid: str):
     if mid not in archive.club.members:
         raise HTTPException(404)
-    return page(request, "member.html", member=archive.club.members[mid], h=archive.member_history(mid),
-                total=len(archive.meetings))
+    m, viewer, club = archive.club.members[mid], request.state.member, archive.club
+    values = {"email": (m.email, f"mailto:{m.email}"), "phone": (m.phone, f"tel:{m.phone}"),
+              "address": (m.address, None), "birthday": (monthday(m.birthday), None)}
+    # (field, value, link), with the value blank unless this viewer may see it (club.can_see)
+    contact = [(f, v if v and club.can_see(viewer, mid, f) else None, href) for f, (v, href) in values.items()]
+    return page(request, "member.html", member=m, h=archive.member_history(mid), total=len(archive.meetings),
+                contact=contact, is_me=viewer == mid, is_officer=club.members[viewer].officer)
 
 
 @app.get("/roster", response_class=HTMLResponse)
 def roster(request: Request):
-    """Members' public-to-members details only: no phone, address or email."""
+    """Everyone on the roster; contact details are on each member's own page."""
     def since(m):
         try:
             return dt.date.fromisoformat(m.member_since) if m.member_since else None
@@ -308,7 +398,8 @@ def roster(request: Request):
     gone = ("inactive", "silent key")
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
     return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
-                active=sum(m.status.lower() not in gone for m in ms))
+                active=sum(m.status.lower() not in gone for m in ms),
+                is_officer=archive.club.members[request.state.member].officer)
 
 
 @app.get("/bylaws", response_class=HTMLResponse)

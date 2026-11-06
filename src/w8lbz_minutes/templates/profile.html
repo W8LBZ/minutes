@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Your profile{% endblock %}{% block body %}
+<h1>Your profile</h1>
+<p class="muted">{{ m.name }}{% if m.callsign %} · {{ m.callsign }}{% endif %}{% if m.license_class %} · {{ m.license_class }}{% endif %}.
+Your name, callsign and license class are kept by the Secretary; ask an officer to change them.</p>
+{% if saved and not error %}<p class="msg ok">Saved. The club roster is updated.</p>{% endif %}
+{% if email_sent %}<p class="msg ok">We sent a confirmation link to <b>{{ email_sent }}</b>. Your email changes once you open it.</p>{% endif %}
+{% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+
+<form method="post" action="/profile" class="profile">
+  <label>Email <input type="email" name="email" value="{{ m.email or '' }}" autocomplete="email">
+    <span class="hint">Also how you sign in. A change takes effect after you confirm it from the new address.</span></label>
+  <label>Phone <input type="tel" name="phone" value="{{ m.phone or '' }}" maxlength="40" autocomplete="tel"></label>
+  <label>Address <textarea name="address" rows="3" maxlength="200" autocomplete="street-address">{{ m.address or '' }}</textarea></label>
+  <fieldset><legend>Birthday <span class="hint">(month and day only; no year)</span></legend>
+    {% set bm = m.birthday[:2]|int if m.birthday else 0 %}{% set bd = m.birthday[3:]|int if m.birthday else 0 %}
+    <select name="bmonth" aria-label="Month"><option value="">Month</option>{% for i in range(1, 13) %}<option value="{{ i }}" {{ 'selected' if i == bm }}>{{ ['January','February','March','April','May','June','July','August','September','October','November','December'][i-1] }}</option>{% endfor %}</select>
+    <select name="bday" aria-label="Day"><option value="">Day</option>{% for i in range(1, 32) %}<option {{ 'selected' if i == bd }}>{{ i }}</option>{% endfor %}</select>
+  </fieldset>
+
+  <fieldset><legend>Share with all members</legend>
+    <p class="hint">Officers can always see your details; the Secretary keeps the roster. Tick what other members may see on the Roster page.
+    Sharing your birthday also lets the club wish you a happy birthday at the meeting.</p>
+    {% for f in shareable %}<label class="check"><input type="checkbox" name="share" value="{{ f }}" {{ 'checked' if f in m.share }}> {{ f|capitalize }}</label>{% endfor %}
+  </fieldset>
+  <p><button class="btn" type="submit">Save</button></p>
+</form>
+{% endblock %}

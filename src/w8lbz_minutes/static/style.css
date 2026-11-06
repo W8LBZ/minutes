@@ -55,3 +55,12 @@ nav.top .drop a:hover, nav.top .drop button:hover { background: #eef2e6; text-de
 nav.top .drop form { margin: 0; border-top: 1px solid #e3e3dc; }
 .about dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1.2rem; } .about dt { color: #667; }
 .changelog h2 { font-size: 1.05rem; margin: 1.2rem 0 .3rem; } .changelog li { margin: .2rem 0; }
+form.profile { max-width: 34rem; } form.profile > label { display: block; margin: .8rem 0; font-weight: 600; }
+form.profile input[type=email], form.profile input[type=tel], form.profile textarea { display: block; width: 100%; box-sizing: border-box; padding: .4rem .5rem; font: inherit; font-weight: normal; margin-top: .2rem; }
+form.profile .hint { display: block; font-weight: normal; font-size: .85rem; color: #667; }
+form.profile fieldset { border: 1px solid #d9dccf; border-radius: .4rem; margin: 1rem 0; padding: .6rem .9rem; } form.profile legend { font-weight: 600; }
+form.profile select { font: inherit; padding: .25rem; } form.profile label.check { display: inline-block; margin-right: 1.2rem; font-weight: normal; }
+svg.lock { width: .85em; height: .85em; vertical-align: -.05em; fill: #8a8f80; stroke: #8a8f80; stroke-width: 2.2; } svg.lock rect { stroke: none; }
+div.change { white-space: pre-line; }
+.contactcard { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.2rem; } .contactcard dt { color: #667; }
+.contactcard dd { margin: 0; } .contactcard dd.address { white-space: pre-line; }

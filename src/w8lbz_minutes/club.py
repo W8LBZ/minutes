@@ -44,6 +44,10 @@ class Member:
     aliases: list[str] = field(default_factory=list)
     events: list[dict] = field(default_factory=list)  # from the Membership Log tab
     member_since: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    birthday: str | None = None  # MM-DD
+    share: list[str] = field(default_factory=list)  # fields shown to all members (officers see everything)
 
     @property
     def name(self) -> str:
@@ -60,13 +64,18 @@ class Club:
         self.email = cfg.get("email") or {}
         self.redact = [_n(x) for x in (cfg.get("privacy") or {}).get("never_record", [])]
 
+        self._mtime = None  # set when the people come from the roster cache, so refresh() can notice a sync
         if roster is None and "members" in cfg:  # inline members (tests, example config)
             roster = [{"id": k, **(v or {})} for k, v in cfg["members"].items()]
         if roster is None and ROSTER_CACHE.exists():
+            self._mtime = ROSTER_CACHE.stat().st_mtime
             roster = json.loads(ROSTER_CACHE.read_text())
+        self._load(roster or [])
+
+    def _load(self, roster: list[dict]) -> None:
         known = {f.name for f in fields(Member)}
         self.members: dict[str, Member] = {}
-        for d in roster or []:
+        for d in roster:
             self.members[d["id"]] = Member(**{k: v for k, v in d.items() if k in known})
         self._auto_short_names()
         # A former callsign (e.g. before a vanity change) listed in aliases maps to the member.
@@ -74,6 +83,18 @@ class Club:
                            for a in m.aliases if CALLSIGN.match(a)}
         for m in self.members.values():  # callsign aliases aren't name spellings
             m.aliases = [a for a in m.aliases if not CALLSIGN.match(a)]
+        self.__dict__.pop("_speaker_patterns", None)  # cached; rebuilt from the new names
+
+    def refresh(self) -> bool:
+        """Reload people if the roster cache changed on disk (e.g. the nightly sync). Cheap: one stat."""
+        if self._mtime is None or not ROSTER_CACHE.exists():
+            return False
+        mtime = ROSTER_CACHE.stat().st_mtime
+        if mtime == self._mtime:
+            return False
+        self._mtime = mtime
+        self._load(json.loads(ROSTER_CACHE.read_text()))
+        return True
 
     def canonical(self, mid: str) -> str:
         """Current id for a member id that may be an old callsign."""
@@ -109,6 +130,16 @@ class Club:
         return bool(m and (m.officer or m.minutes_editor))
 
     can_edit = can_lead
+
+    def can_see(self, viewer: str | None, mid: str, fld: str) -> bool:
+        """Contact details: officers and the member always; other members only what was shared."""
+        v, m = self.members.get(viewer or ""), self.members.get(mid)
+        return bool(m and v and (v.officer or v.id == m.id or fld in m.share))
+
+    @property
+    def secretaries(self) -> list[str]:
+        """Members whose title includes Secretary (they keep the roster, bylaws IV.C)."""
+        return [m.id for m in self.members.values() if m.role and "secretary" in m.role.lower()]
 
     @property
     def leaders(self) -> list[str]:

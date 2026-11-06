@@ -1,6 +1,7 @@
 {% extends "base.html" %}{% block title %}Roster{% endblock %}{% block body %}
-<h1>Roster</h1>
-<p class="muted">{{ active }} active members. From the club roster sheet, synced daily.</p>
+<div class="headrow"><h1>Roster</h1>
+<p><a href="/profile">Edit your details and what you share</a>{% if is_officer %} · <a href="/roster/changes">Recent changes</a>{% endif %}</p></div>
+<p class="muted">{{ active }} active members. From the club roster sheet, synced daily. Click a name for contact details{% if not is_officer %} the member has shared{% endif %} and their meeting history.</p>
 <table class="list"><thead><tr><th>Name</th><th>Callsign</th><th>License</th><th>Office</th><th>Status</th><th>Member since</th></tr></thead>
 <tbody>{% for m, since in rows %}<tr>
 <td data-sort="{{ m.last|lower }} {{ m.first|lower }}"><a href="/members/{{ m.id }}">{{ m.name }}</a></td><td class="cs">{{ m.callsign or '' }}</td>

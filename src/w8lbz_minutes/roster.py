@@ -5,7 +5,12 @@ Columns used: callsign, full_name, email, Title(s), is_officer, is_board, Class,
 minutes_editor (may lead meetings and edit minutes), Status (Active / Inactive /
 Silent Key / Prospect) and aliases (comma-separated spellings seen in old minutes).
 
-Only the fields the app needs are cached (no phone or address).
+Also phone, address, birthday (MM-DD) and share (which of email, phone, address,
+birthday the member shows to all members; officers always see them). The cache
+file is readable only by the app.
+
+Members' own profile edits are written back through `Sheet`, which only ever
+writes cell values to existing columns: never formatting, dropdowns or structure.
 """
 from __future__ import annotations
 
@@ -35,6 +40,73 @@ def _sheet() -> tuple[str, str]:
     if not r.get("sheet_id"):
         raise SystemExit("Set roster.sheet_id in club.yaml")
     return r["sheet_id"], r.get("tab", "Member Roster")
+
+
+SHAREABLE = ("email", "phone", "address", "birthday")
+EDITABLE = ("email", "phone", "address", "birthday", "share")  # member field = lowercase sheet header
+
+
+def _col(i: int) -> str:
+    """0-based column index -> A1 letters."""
+    s = ""
+    i += 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+class SheetError(Exception):
+    pass
+
+
+class Sheet:
+    """Values-only read/write of the roster tab, for members' profile edits."""
+
+    def __init__(self, session=None):
+        if session is None:
+            import google.auth.transport.requests as gr
+            from google.oauth2 import service_account
+            creds = service_account.Credentials.from_service_account_file(
+                KEY_FILE, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+            session = gr.AuthorizedSession(creds)
+        self.s = session
+        self.sid, self.tab = _sheet()
+
+    def _url(self, rng: str = "") -> str:
+        return f"https://sheets.googleapis.com/v4/spreadsheets/{self.sid}/values{rng}"
+
+    def read(self) -> list[list[str]]:
+        r = self.s.get(self._url(f"/'{self.tab}'"), params={"valueRenderOption": "UNFORMATTED_VALUE"})
+        r.raise_for_status()
+        return [[str(x) for x in row] for row in r.json().get("values", [])]
+
+    def write(self, cells: dict[str, str]) -> None:
+        """cells: A1 address (e.g. D5) -> value. RAW, so nothing typed is ever parsed as a formula."""
+        body = {"valueInputOption": "RAW",
+                "data": [{"range": f"'{self.tab}'!{a1}", "values": [[v]]} for a1, v in cells.items()]}
+        r = self.s.post(self._url(":batchUpdate"), json=body)
+        if r.status_code == 403:
+            raise SheetError("The app can't write to the roster sheet yet (it needs Editor access).")
+        r.raise_for_status()
+
+    def update_member(self, callsign: str | None, full_name: str, changes: dict[str, str]) -> dict[str, str]:
+        """Write `changes` (field -> new value) into the member's row. Returns the old values."""
+        values = self.read()
+        header = [h.strip().lower() for h in values[0]]
+        missing = [f for f in changes if f not in header]
+        if missing:
+            raise SheetError(f"The roster sheet has no {', '.join(missing)} column yet.")
+        key = header.index("callsign") if callsign else header.index("full_name")
+        want = (callsign or full_name).strip().upper()
+        rows = [i for i, row in enumerate(values[1:], start=2)
+                if len(row) > key and row[key].strip().upper() == want]
+        if len(rows) != 1:
+            raise SheetError(f"Couldn't find exactly one roster row for {callsign or full_name}.")
+        row = values[rows[0] - 1] + [""] * len(header)
+        old = {f: row[header.index(f)] for f in changes}
+        self.write({f"{_col(header.index(f))}{rows[0]}": v for f, v in changes.items() if old[f] != v})
+        return old
 
 
 def fetch_rows(tab: str | None = None) -> list[dict[str, str]]:
@@ -76,6 +148,10 @@ def to_members(rows: list[dict[str, str]]) -> list[dict]:
             "aliases": _split(r.get("aliases", "")),
             "minutes_editor": _truthy(r.get("minutes_editor", "")),
             "status": r.get("status", "").strip() or "Active",
+            "phone": r.get("phone", "").strip() or None,
+            "address": r.get("address", "").strip() or None,
+            "birthday": _month_day(r.get("birthday", "")),
+            "share": [x.lower() for x in _split(r.get("share", "")) if x.lower() in SHAREABLE],
         })
     return out
 
@@ -95,6 +171,15 @@ def _iso_date(v: str) -> str | None:
             except ValueError:
                 pass
     return v
+
+
+def _month_day(v: str) -> str | None:
+    """Birthday as MM-DD (the year is never kept), from MM-DD, a typed date or a Sheets date serial."""
+    v = v.strip()
+    if re.fullmatch(r"\d{2}-\d{2}", v):
+        return v
+    iso = _iso_date(v) if v else None
+    return iso[5:] if iso and re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) else None
 
 
 def attach_log(members: list[dict], log: list[dict[str, str]]) -> None:
