@@ -48,6 +48,16 @@ The Google Sheet stays the source of truth; the app writes values back to it (va
 - **Now:** a link in the app (Club Links) to the Google Doc version.
 - **Later:** the bylaws as text under version control, with each amendment tied to the meeting and motion that adopted it, and a history page showing what changed and when. Open question: members-only or public.
 
+## AI assistance (after tracked business items)
+These build on tracked business items and use the typed minutes we already have, so none of them needs audio.
+- **Suggested follow-ups:** when minutes are submitted, AI reads them and proposes tracked items with an owner and due date (e.g. "Jim will call the park about Field Day"). The leader accepts, edits or dismisses each one. It also flags business that has gone quiet for several weeks.
+- **Summaries:** a short "this week at the club" paragraph at the top of the minutes email, and later for the Discord post.
+- **Ask the archive:** questions like "when did we last discuss the tower?", answered with links to the minutes they came from.
+- **Ground rules:**
+  - A person always approves; the AI never adds or changes anything on its own, and AI-drafted text is marked until someone accepts it.
+  - Names on the never-record list are removed before any text leaves the server. The club is told that minutes text goes to an AI service.
+  - Through OpenRouter, so the model can be chosen and changed; the expected cost is pennies a month.
+
 ## Later
 - **Audio capture and live transcription** (see REQUIREMENTS.md §4.1–4.2): browser room capture plus a meeting bot, cloud speech-to-text, OpenRouter drafting.
 - **Discord:** a post-meeting summary and weekly reminders.
