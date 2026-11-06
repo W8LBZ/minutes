@@ -32,6 +32,12 @@ git -C "$REPO" fetch -q origin
 if [ -d "$DIR/app" ]; then git -C "$DIR/app" reset -q --hard "origin/$B"
 else git -C "$REPO" worktree add -q --detach "$DIR/app" "origin/$B"; fi
 
+# Older branches have no preview mode: they would send real email and write to the real roster sheet.
+if ! grep -q W8LBZ_PREVIEW "$DIR/app/src/w8lbz_minutes/club.py"; then
+  echo "Refusing: $B has no preview mode (it would send real email). Rebase it on main first." >&2
+  git -C "$REPO" worktree remove --force "$DIR/app"; rm -rf "${DIR:?}"; exit 1
+fi
+
 # A fresh copy of the data each time; the preview keeps its own sign-ins (auth.sqlite) between updates.
 mkdir -p "$DIR/data"
 find "$DIR/data" -mindepth 1 -maxdepth 1 ! -name auth.sqlite -exec rm -rf {} +
