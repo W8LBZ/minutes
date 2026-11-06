@@ -1,0 +1,10 @@
+club: {name: Test Club, callsign: W0TST}
+links: []
+leaders: [doe]
+privacy:
+  never_record: [Tiny Visitor]
+members:
+  doe:   {first: Jane, last: Doe, short: Jane D}
+  dunn:  {first: Jane, last: Dunn}
+  roe:   {first: Rick, last: Roe, aliases: [Rowe]}
+  kim:   {first: Sam,  last: Kim}

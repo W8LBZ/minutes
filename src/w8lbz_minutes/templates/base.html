@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}W8LBZ Minutes{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/minutes.css"></head>
+<body>
+<nav class="top">
+  <a class="brand" href="/"><img src="/static/logo.png" alt="">W8LBZ Minutes</a>
+  <a href="/">Archive</a><a href="/stats">Stats</a><a href="/guests">Guests</a>
+  <form action="/search"><input name="q" type="search" placeholder="Search all minutes…" value="{{ q or '' }}"></form>
+</nav>
+<main>{% block body %}{% endblock %}</main>
+</body></html>

@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block body %}
+<h1>Search{% if q %}: “{{ q }}”{% endif %}</h1>
+{% if q %}<p class="muted">{{ results|length }} result{{ 's' if results|length != 1 }}{% if results|length == 100 %} (showing first 100){% endif %}</p>{% endif %}
+<ul class="results">{% for r in results %}
+<li><a href="/meetings/{{ r.slug }}">{{ r.slug }}</a> <span class="sec">{{ r.section }}</span>
+{% if r.member %}<a class="who" href="/members/{{ r.member }}">{{ club.short(r.member) }}</a>{% endif %}
+<div>{{ r.snippet|safe }}</div></li>{% endfor %}</ul>
+{% endblock %}

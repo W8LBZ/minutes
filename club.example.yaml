@@ -1,0 +1,23 @@
+# Copy to club.yaml (local only, git-ignored) and fill in.
+# People will come from the roster Google Sheet; the members section is a stopgap.
+
+club:
+  name: Example Radio Club
+  callsign: W0XYZ
+  meeting_day: Thursday
+
+links:  # shown in the "Club Links" footer of the minutes
+  - label: Teams meeting
+    url: https://teams.live.com/meet/REPLACE_ME
+  - label: Club Discord
+    url: https://discord.com/invite/REPLACE_ME
+
+leaders: [doe]     # may lead a meeting
+editors: [roe]     # standing trusted editors
+
+privacy:
+  never_record: []  # names never shown in minutes or the archive
+
+members:
+  doe: {first: Jane, last: Doe, short: Jane D, callsign: KD8XYZ, role: Secretary}
+  roe: {first: Rick, last: Roe, aliases: [Rowe]}

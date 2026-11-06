@@ -1,0 +1,38 @@
+{# The minutes document itself; shared by the web view and the PDF. #}
+<article class="minutes">
+  <header class="mh">
+    <img src="{{ '' if pdf else '/' }}static/logo.png" alt="W8LBZ logo">
+    <div>
+      <div class="club">{{ club.info.callsign }} · {{ club.info.name }}</div>
+      <h1>Meeting Minutes</h1>
+      <div class="date">{{ m.date|longdate }}</div>
+      {% if m.leader %}<div class="leader">Led by {{ club.name(m.leader) }}</div>{% endif %}
+    </div>
+  </header>
+
+  <h2>Attendance <span class="count">{{ m.attendance }} members{% if m.guests %} + {{ m.guests|length }} guest{{ 's' if m.guests|length > 1 }}{% endif %}</span></h2>
+  <dl class="att">
+    <dt>In person ({{ m.in_person|length }})</dt>
+    <dd>{% for mid in m.in_person|sort %}{{ club.name(mid) }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
+    <dt>On Teams ({{ m.remote|length }})</dt>
+    <dd>{% for mid in m.remote|sort %}{{ club.name(mid) }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
+    {% if m.guests %}<dt>Guests ({{ m.guests|length }})</dt>
+    <dd>{% for g in m.guests %}{{ g.name }}{% if g.callsign %} <span class="cs">{{ g.callsign }}</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}</dd>{% endif %}
+  </dl>
+
+  {% for sec in SECTIONS %}{% set items = m.items(sec) %}
+    {% if items or sec in ('Upcoming Chow',) %}
+    <h2>{{ sec }}</h2>
+    {% if sec == 'Upcoming Chow' and not items %}<p class="muted">See the attached chow list.</p>{% endif %}
+    <ul class="items {{ 'reports' if sec == 'Community Reports' }}">
+      {% for it in items %}<li>{{ it.text|linkify }}{% if it.member and not pdf %} <a class="who" href="/members/{{ it.member }}">{{ club.short(it.member) }}</a>{% endif %}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  {% endfor %}
+
+  <footer class="links">
+    <h2>Club Links</h2>
+    <ul>{% for l in club.links %}<li>{{ l.label }}: <a href="{{ l.url }}">{{ l.url }}</a></li>{% endfor %}</ul>
+    <p class="ver">Version {{ m.version }}{% if m.status == 'imported' %} · imported from {{ m.source }}, not yet reviewed{% endif %}{% if m.note and not pdf %} · {{ m.note }}{% endif %}</p>
+  </footer>
+</article>
