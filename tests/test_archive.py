@@ -148,3 +148,12 @@ def test_bylaws_page(tmp_path, monkeypatch):
     (tmp_path / "bylaws.md").write_text("# Constitution\n\n### Article I\n\n**A.** Meetings <b>weekly</b>.")
     html = c.get("/bylaws").text
     assert "<h1>Constitution</h1>" in html and "<strong>A.</strong>" in html
+
+
+def test_links_page_lists_club_links(monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    monkeypatch.setattr(web.archive.club, "links", [{"label": "Club Discord", "url": "https://discord.example/x"}])
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    html = TestClient(web.app).get("/links").text
+    assert '<a href="https://discord.example/x">Club Discord</a>' in html and 'href="/links"' in html
