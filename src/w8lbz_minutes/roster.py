@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 from .club import ROOT, ROSTER_CACHE as CACHE
@@ -56,15 +57,16 @@ def to_members(rows: list[dict[str, str]]) -> list[dict]:
     out = []
     for r in rows:
         name, cs = r.get("full_name", "").strip(), r.get("callsign", "").strip().upper()
-        if not name or not cs:
+        if not name:
             continue
         first, _, last = name.partition(" ")
         titles = _split(r.get("title(s)", ""))
         out.append({
-            "id": cs.lower(),
+            # Callsign is the stable key; fall back to the name (e.g. a silent key whose call is unknown).
+            "id": cs.lower() or re.sub(r"[^a-z]+", "-", name.lower()).strip("-"),
             "first": first,
             "last": last,
-            "callsign": cs,
+            "callsign": cs or None,
             "email": r.get("email", "").strip() or None,
             "role": ", ".join(titles) or None,
             "officer": _truthy(r.get("is_officer", "")),
