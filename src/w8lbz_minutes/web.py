@@ -33,6 +33,12 @@ templates.env.filters["linkify"] = linkify
 DATES = {"list": "%b %-d, %Y", "document": "%B %-d, %Y", **(archive.club.info.get("date_formats") or {})}
 templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
 templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
+def by_last_name(ids):
+    c = archive.club
+    return sorted(ids, key=lambda i: (c.members[i].last, c.members[i].first) if i in c.members else (i, ""))
+
+
+templates.env.filters["by_last_name"] = by_last_name
 templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS)
 
 
