@@ -1,0 +1,24 @@
+[Unit]
+Description=W8LBZ minutes web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=minutes
+Group=minutes
+WorkingDirectory=/opt/w8lbz-minutes
+Environment=W8LBZ_CONFIG=/etc/w8lbz-minutes/club.yaml
+Environment=W8LBZ_DATA=/var/lib/w8lbz-minutes
+Environment=W8LBZ_GOOGLE_KEY=/etc/w8lbz-minutes/google-service-account.json
+EnvironmentFile=-/etc/w8lbz-minutes/env
+ExecStart=/opt/w8lbz-minutes/.venv/bin/w8lbz-minutes serve --host 0.0.0.0 --port 8000
+Restart=on-failure
+# Hardening: the app only needs to write its data directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/w8lbz-minutes
+
+[Install]
+WantedBy=multi-user.target

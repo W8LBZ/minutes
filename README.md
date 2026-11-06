@@ -26,6 +26,15 @@ The roster sync needs a Google service-account key at `private/google-service-ac
 
 PDF generation needs the system Pango library: `sudo apt install libpango-1.0-0 libpangoft2-1.0-0`.
 
+## Deploy (Debian container)
+As root on the container:
+```sh
+curl -fsSL https://raw.githubusercontent.com/W8LBZ/minutes/main/deploy/setup.sh | bash   # first time
+/opt/w8lbz-minutes/deploy/update.sh                                                    # after each merge to main
+```
+Then put `club.yaml` and `google-service-account.json` in `/etc/w8lbz-minutes/`, and data in `/var/lib/w8lbz-minutes/`.
+The app runs as the `minutes` user on port 8000. The roster syncs daily at 04:00.
+
 ## Config
 `club.yaml` (local only, git-ignored; copy from `club.example.yaml`) holds the club links, the leaders and editors lists, the private never-record list, and a stopgap roster. The Google Sheet roster will replace the roster part.
 

@@ -1,0 +1,14 @@
+[Unit]
+Description=Sync the W8LBZ roster from the Google Sheet
+
+[Service]
+Type=oneshot
+User=minutes
+Group=minutes
+WorkingDirectory=/opt/w8lbz-minutes
+Environment=W8LBZ_CONFIG=/etc/w8lbz-minutes/club.yaml
+Environment=W8LBZ_DATA=/var/lib/w8lbz-minutes
+Environment=W8LBZ_GOOGLE_KEY=/etc/w8lbz-minutes/google-service-account.json
+ExecStart=/opt/w8lbz-minutes/.venv/bin/w8lbz-minutes roster
+# Pick up roster changes in the running app
+ExecStartPost=+/bin/systemctl try-restart w8lbz-minutes
