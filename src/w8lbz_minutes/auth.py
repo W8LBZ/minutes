@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import smtplib
 import sqlite3
@@ -55,6 +56,8 @@ create table if not exists links (token_hash text primary key, member text not n
 create table if not exists passkeys (id text primary key, member text not null, public_key blob not null,
   sign_count integer not null, transports text, label text, created integer not null, last_used integer,
   aaguid text);
+create table if not exists email_changes (token_hash text primary key, member text not null,
+  email text not null, expires integer not null, created integer not null);
 create table if not exists challenges (id text primary key, challenge blob not null, member text,
   kind text not null, expires integer not null);
 """
@@ -156,6 +159,38 @@ class Auth:
             return None
         self.db.execute("update links set used=1 where token_hash=?", (_hash(token),))
         return row["member"], row["next"] or "/"
+
+    # ---------------- email changes ----------------
+    def start_email_change(self, member: str, email: str, base_url: str | None = None) -> str | None:
+        """Email a confirmation link to the new address. Returns an error message, or None if sent."""
+        email = email.strip()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            return "That doesn't look like an email address."
+        other = self.member_by_email(email)
+        if other and other != member:
+            return "Another member already uses that address."
+        now = int(time.time())
+        if self.db.execute("select count(*) from email_changes where member=? and created>?",
+                           (member, now - 3600)).fetchone()[0] >= EMAILS_PER_HOUR:
+            return "Too many tries; please wait an hour."
+        token = secrets.token_urlsafe(32)
+        self.db.execute("insert into email_changes values (?,?,?,?,?)",
+                        (_hash(token), member, email, now + LINK_MINUTES * 60, now))
+        url = f"{(base_url or self.base_url or '').rstrip('/')}/profile/email?t={token}"
+        send_email(email, "Confirm your new W8LBZ Minutes email", only_to=self.club.email_only_to(),
+                   body=f"Hi {self.club.members[member].first},\n\nTo use this address for W8LBZ Minutes and the club "
+                   f"roster, open this link within {LINK_MINUTES} minutes:\n\n{url}\n\n"
+                   f"If you didn't ask for this, ignore this email and nothing changes.\n\n73,\nW8LBZ")
+        return None
+
+    def confirm_email_change(self, token: str) -> tuple[str, str] | None:
+        """(member, new email) for a valid link, which is then used up."""
+        row = self.db.execute("select member, email, expires from email_changes where token_hash=?",
+                              (_hash(token),)).fetchone()
+        self.db.execute("delete from email_changes where token_hash=?", (_hash(token),))
+        if not row or row["expires"] < time.time():
+            return None
+        return row["member"], row["email"]
 
     # ---------------- passkeys ----------------
     def _challenge(self, kind: str, challenge: bytes, member: str | None = None) -> str:

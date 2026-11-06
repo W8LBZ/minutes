@@ -44,6 +44,10 @@ class Member:
     aliases: list[str] = field(default_factory=list)
     events: list[dict] = field(default_factory=list)  # from the Membership Log tab
     member_since: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    birthday: str | None = None  # MM-DD
+    share: list[str] = field(default_factory=list)  # fields shown to all members (officers see everything)
 
     @property
     def name(self) -> str:
@@ -109,6 +113,16 @@ class Club:
         return bool(m and (m.officer or m.minutes_editor))
 
     can_edit = can_lead
+
+    def can_see(self, viewer: str | None, mid: str, fld: str) -> bool:
+        """Contact details: officers and the member always; other members only what was shared."""
+        v, m = self.members.get(viewer or ""), self.members.get(mid)
+        return bool(m and v and (v.officer or v.id == m.id or fld in m.share))
+
+    @property
+    def secretaries(self) -> list[str]:
+        """Members whose title includes Secretary (they keep the roster, bylaws IV.C)."""
+        return [m.id for m in self.members.values() if m.role and "secretary" in m.role.lower()]
 
     @property
     def leaders(self) -> list[str]:

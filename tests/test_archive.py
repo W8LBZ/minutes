@@ -70,20 +70,35 @@ def test_membership_log():
     assert ms[1]["id"] == "old-timer" and ms[1]["events"][0]["event"] == "Silent Key"
 
 
-def test_roster_page_shows_no_contact_details(tmp_path, monkeypatch):
+def test_roster_contact_details_follow_sharing(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
     from w8lbz_minutes import web
     c = Club(FIX / "test-club.yaml", roster=[
         {"id": "kd8aaa", "first": "Jane", "last": "Doe", "callsign": "KD8AAA", "email": "jane@example.org",
+         "phone": "419-555-0101", "address": "1 Elm St", "birthday": "07-04", "share": ["phone", "birthday"],
          "license_class": "Extra", "role": "Secretary", "officer": True, "member_since": "2024-03-07"},
+        {"id": "kd8ccc", "first": "Bob", "last": "Member", "callsign": "KD8CCC", "email": "bob@example.org",
+         "phone": "419-555-0199", "address": "9 Oak Ave"},
         {"id": "kd8bbb", "first": "Old", "last": "Timer", "status": "Silent Key", "member_since": "not a date"}])
     monkeypatch.setattr(web, "archive", Archive(tmp_path, c))
     monkeypatch.setattr(web.templates.env, "globals", {**web.templates.env.globals, "club": c})
-    monkeypatch.setattr(web.authn, "member_for", lambda token: "kd8aaa")
-    html = TestClient(web.app).get("/roster").text
+    viewer = {"id": "kd8ccc"}
+    monkeypatch.setattr(web.authn, "member_for", lambda token: viewer["id"])
+    client = TestClient(web.app)
+
+    html = client.get("/roster").text  # Bob, a regular member
     assert "KD8AAA" in html and "Secretary" in html and "Mar 7, 2024" in html and "Silent Key" in html
-    assert "jane@example.org" not in html
+    assert "419-555-0101" in html and "July 4" in html          # Jane shared these
+    assert "jane@example.org" not in html and "1 Elm St" not in html  # but not these
+    assert "bob@example.org" in html and "9 Oak Ave" in html     # Bob sees his own
     assert html.index("Doe") < html.index("Timer")
+    assert client.get("/roster/changes").status_code == 403     # officers only
+
+    viewer["id"] = "kd8aaa"  # Jane, an officer, sees everything, with unshared details marked
+    html = client.get("/roster").text
+    assert "bob@example.org" in html and "9 Oak Ave" in html and "Only officers can see this" in html
+    assert client.get("/roster/changes").status_code == 200
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
