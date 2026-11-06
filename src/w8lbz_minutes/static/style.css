@@ -16,3 +16,4 @@ table.list { border-collapse: collapse; width: 100%; } .list th, .list td { padd
 .results .sec { font-size: .8rem; color: #667; margin: 0 .4rem; } mark { background: #fbe58a; }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; } @media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
 .cs { font-family: monospace; }
+th.asc::after { content: " ▲"; } th.desc::after { content: " ▼"; }

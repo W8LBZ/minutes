@@ -2,7 +2,7 @@
 <h1>{{ member.name or member.last }}{% if member.callsign %} <span class="cs">{{ member.callsign }}</span>{% endif %}</h1>
 <p>Attended {{ h.present|length }} of {{ total }} meetings
 ({{ h.present|selectattr(1, 'eq', 'in person')|list|length }} in person,
-{{ h.present|selectattr(1, 'eq', 'Teams')|list|length }} on Teams).
+{{ h.present|selectattr(1, 'eq', 'online')|list|length }} online).
 {% if h.present %}Last attended {{ h.present[0][0].date|longdate }}.{% endif %}</p>
 <h2>Community reports</h2>
 <ul class="results">{% for m, it in h.reports %}

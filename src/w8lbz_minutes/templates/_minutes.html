@@ -10,14 +10,14 @@
     </div>
   </header>
 
-  <h2>Attendance <span class="count">{{ m.attendance }} members{% if m.guests %} + {{ m.guests|length }} guest{{ 's' if m.guests|length > 1 }}{% endif %}</span></h2>
+  <h2>Attendance <span class="count">{{ m.attendance }} members{% set ng = m.guests|length + m.visitors %}{% if ng %} + {{ ng }} guest{{ 's' if ng > 1 }}{% endif %}</span></h2>
   <dl class="att">
     <dt>In person ({{ m.in_person|length }})</dt>
     <dd>{% for mid in m.in_person|sort %}{{ club.name(mid) }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
-    <dt>On Teams ({{ m.remote|length }})</dt>
+    <dt>Online ({{ m.remote|length }})</dt>
     <dd>{% for mid in m.remote|sort %}{{ club.name(mid) }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
-    {% if m.guests %}<dt>Guests ({{ m.guests|length }})</dt>
-    <dd>{% for g in m.guests %}{{ g.name }}{% if g.callsign %} <span class="cs">{{ g.callsign }}</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}</dd>{% endif %}
+    {% if m.guests or m.visitors %}<dt>Guests ({{ m.guests|length + m.visitors }})</dt>
+    <dd>{% for g in m.guests %}{{ g.name }}{% if g.callsign %} <span class="cs">{{ g.callsign }}</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if m.visitors %}{{ ', ' if m.guests }}{{ m.visitors }} visitor{{ 's' if m.visitors > 1 }}{% endif %}</dd>{% endif %}
   </dl>
 
   {% for sec in SECTIONS %}{% set items = m.items(sec) %}
