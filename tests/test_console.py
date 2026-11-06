@@ -28,6 +28,17 @@ def test_start_carries_business_forward(tmp_path):
     assert ctx["history"]["kim"] == [("2026-11-05", "Sam built a dipole")]
 
 
+def test_past_guests_exclude_members_and_sort_recent_first(tmp_path):
+    for d, guests in ((dt.date(2026, 10, 1), [{"name": "Pat Guest", "callsign": "KE8ABC"}, {"name": "Rick Roe"}]),
+                      (dt.date(2026, 10, 8), [{"name": "Lee Visitor"}])):
+        Meeting(date=d, status="published", in_person=["roe"] if d.day == 8 else [], guests=guests).save(tmp_path)
+    a = Archive(tmp_path, club)
+    m = console.start(a, dt.date(2026, 11, 12), "doe")
+    past = console.context(a, m)["past_guests"]
+    assert [g["name"] for g in past] == ["Lee Visitor", "Pat Guest"]  # Rick Roe became a member
+    assert past[1] == {"name": "Pat Guest", "callsign": "KE8ABC", "visits": 1, "last": "2026-10-01"}
+
+
 def test_apply_saves_and_drops_never_record_guests(tmp_path):
     a = archive_with_prev(tmp_path)
     console.start(a, dt.date(2026, 11, 12), "doe")

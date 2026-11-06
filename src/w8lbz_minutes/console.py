@@ -61,7 +61,11 @@ def context(archive: Archive, m: Meeting) -> dict:
                 for it in mt.items("Community Reports") if it.member == x.id][:3]
         history[x.id] = past
     guests = {}
+    past = []  # earlier guests who aren't members, most recent first (for the quick-pick buttons)
     for g in archive.guests():
+        if not g.get("member") and g["visits"][-1][0] < m.date:
+            past.append({"name": g["name"], "callsign": g["callsign"], "visits": len(g["visits"]),
+                         "last": g["visits"][-1][0].isoformat()})
         info = {"name": g["name"], "callsign": g["callsign"], "visits": len(g["visits"]),
                 "last": g["visits"][-1][0].isoformat(), "member": g.get("member")}
         guests[_key(g["name"])] = info
@@ -78,7 +82,9 @@ def context(archive: Archive, m: Meeting) -> dict:
                     for x in members],
         "history": history,
         "guest_history": guests,
+        "past_guests": sorted(past, key=lambda g: (g["last"], g["visits"]), reverse=True),
         "sections": SECTIONS,
+        "invite_after": int(club.info.get("invite_after_visits", 3)),
     }
 
 
