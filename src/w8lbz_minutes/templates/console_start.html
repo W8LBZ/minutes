@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Lead a meeting{% endblock %}{% block body %}
+<h1>Lead a meeting</h1>
+{% if drafts %}<h2>Meetings in progress</h2>
+<ul class="results">{% for d in drafts %}<li><a class="btn" href="/console/{{ d.slug }}">Continue {{ d.date|listdate }}</a>
+{% if d.leader %} <span class="muted">led by {{ club.name(d.leader) }}</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
+<h2>Start a new meeting</h2>
+<form method="post" action="/console/start" class="startform">
+  <label>Date <input type="date" name="date" value="{{ today.isoformat() }}" required></label>
+  <label>Led by <select name="leader">{% for id in leaders %}<option value="{{ id }}">{{ club.name(id) }}</option>{% endfor %}</select></label>
+  <button class="btn" type="submit">Start meeting</button>
+</form>
+<p class="muted">Old Business and Upcoming Events are copied from the previous meeting, so you only remove what's finished and add what's new.</p>
+{% endblock %}
