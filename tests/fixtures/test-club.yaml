@@ -6,4 +6,4 @@ members:
   doe:   {first: Jane, last: Doe, short: Jane D, minutes_editor: true}
   dunn:  {first: Jane, last: Dunn}
   roe:   {first: Rick, last: Roe, aliases: [Rowe]}
-  kim:   {first: Sam,  last: Kim}
+  kim:   {first: Sam,  last: Kim, aliases: [KD8OLD]}
