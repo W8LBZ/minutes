@@ -121,3 +121,18 @@ def test_stats_periods(client):
     assert "33 meetings on record" in client.get("/stats?period=all").text
     assert "30 meetings in 2024" in client.get("/stats?period=2024").text
     assert "1 meeting in the last 12 months" in client.get("/stats").text
+
+def test_guests_page_moves_new_members_to_their_own_section(tmp_path, monkeypatch):
+    import datetime as dt
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    from w8lbz_minutes.store import Archive
+    for d in (dt.date(2026, 10, 1), dt.date(2026, 10, 8)):
+        Meeting(date=d, status="published", guests=[{"name": "Rick Roe"}, {"name": "Pat Guest"}]).save(tmp_path)
+    Meeting(date=dt.date(2026, 10, 15), status="published", in_person=["roe"]).save(tmp_path)
+    monkeypatch.setattr(web, "archive", Archive(tmp_path, club))
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    html = TestClient(web.app).get("/guests").text
+    current, joined = html.split("<h2>Became members")
+    assert "Pat Guest" in current and "Rick Roe" not in current
+    assert "Rick Roe" in joined and "Oct 15, 2026" in joined and "after 2.0 visits" in joined
