@@ -34,3 +34,5 @@ nav.top .me { background: #4a5d2e; padding: .15rem .6rem; border-radius: 1rem; }
 button.btn { border: 0; cursor: pointer; font: inherit; } .btn.small { padding: .2rem .55rem; font-size: .85rem; }
 .row { display: flex; gap: .5rem; flex-wrap: wrap; }
 .rename { display: flex; gap: .4rem; align-items: center; } .rename .pkname { min-width: 8rem; } .rename input { font: inherit; padding: .2rem .4rem; border: 1px solid #ccd; border-radius: .3rem; min-width: 10rem; }
+.linklist { list-style: none; padding: 0; } .linklist li { padding: .45rem 0; border-bottom: 1px solid #e3e3dc; }
+.linklist a { font-weight: 600; margin-right: .5rem; } .linklist .muted { font-size: .85rem; word-break: break-all; }
