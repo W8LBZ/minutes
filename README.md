@@ -50,3 +50,6 @@ Only officers and members ticked `minutes_editor` in the roster can use the lead
 Club data (`archive/`, `data/`, `club.yaml`, credentials) is never committed.
 
 **No login yet.** Keep the server on the LAN or tailnet only.
+
+## Bylaws
+`/bylaws` shows the club's constitution and bylaws from `bylaws.md` in the data directory (`/var/lib/w8lbz-minutes/bylaws.md` on the server). It's kept out of this public repo.
