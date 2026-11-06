@@ -20,6 +20,9 @@ MEETINGS = DATA / "meetings"
 ROSTER_CACHE = DATA / "roster.json"
 
 
+CALLSIGN = re.compile(r"^[A-Z]{1,2}\d[A-Z]{1,3}$", re.I)
+
+
 def _n(s: str) -> str:
     return re.sub(r"[^a-z]", "", s.lower())
 
@@ -62,6 +65,15 @@ class Club:
         for d in roster or []:
             self.members[d["id"]] = Member(**{k: v for k, v in d.items() if k in known})
         self._auto_short_names()
+        # A former callsign (e.g. before a vanity change) listed in aliases maps to the member.
+        self.former_ids = {a.lower(): m.id for m in self.members.values()
+                           for a in m.aliases if CALLSIGN.match(a)}
+        for m in self.members.values():  # callsign aliases aren't name spellings
+            m.aliases = [a for a in m.aliases if not CALLSIGN.match(a)]
+
+    def canonical(self, mid: str) -> str:
+        """Current id for a member id that may be an old callsign."""
+        return self.former_ids.get(mid, mid)
 
     def _auto_short_names(self) -> None:
         """'Chris D' / 'Chris K' style names when a first name is shared."""

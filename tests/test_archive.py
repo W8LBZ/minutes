@@ -48,3 +48,12 @@ def test_file_date():
 def test_permissions_and_possessives():
     assert club.can_lead("doe") and not club.can_lead("kim")
     assert club.speaker_of("Sams antenna fell down") == "kim"
+
+
+def test_former_callsign_maps_to_member(tmp_path, m):
+    from w8lbz_minutes.store import Archive
+    m.in_person = ["doe", "kd8old"]  # stored before Sam's callsign change
+    m.save(tmp_path)
+    a = Archive(tmp_path, club)
+    assert a.meetings[0].in_person == ["doe", "kim"]
+    assert club.members["kim"].aliases == []  # not treated as a name spelling

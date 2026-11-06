@@ -22,7 +22,7 @@ class Archive:
 
     def reload(self) -> None:
         paths = sorted(self.root.glob("*/minutes.md"), reverse=True)
-        self.meetings: list[Meeting] = [Meeting.load(p) for p in paths]
+        self.meetings: list[Meeting] = [self._canonicalize(Meeting.load(p)) for p in paths]
         self.by_slug = {m.slug: m for m in self.meetings}
         self.db = sqlite3.connect(":memory:", check_same_thread=False)
         self.db.execute("create virtual table docs using fts5(slug unindexed, section unindexed, member unindexed, text, tokenize='porter')")
@@ -33,6 +33,17 @@ class Archive:
         rows += [(m.slug, "Guests", "", f"{g['name']} {g.get('callsign', '')} {g.get('notes', '')}")
                  for m in self.meetings for g in m.guests]
         self.db.executemany("insert into docs values (?,?,?,?)", rows)
+
+    def _canonicalize(self, m: Meeting) -> Meeting:
+        """Map ids stored under a member's old callsign to their current one."""
+        c = self.club.canonical
+        m.in_person = [c(x) for x in m.in_person]
+        m.remote = [c(x) for x in m.remote]
+        for items in m.sections.values():
+            for it in items:
+                if it.member:
+                    it.member = c(it.member)
+        return m
 
     def search(self, q: str, limit: int = 100) -> list[dict]:
         terms = re.findall(r"\w+", q)
