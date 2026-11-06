@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Club data never goes in this repo
+archive/
+data/
+private/
+club.yaml
+*.json
+.env

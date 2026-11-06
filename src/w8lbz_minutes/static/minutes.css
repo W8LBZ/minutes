@@ -1,0 +1,19 @@
+.minutes { max-width: 50rem; margin: 0 auto; font: 15px/1.45 "Helvetica Neue", Arial, sans-serif; color: #111; }
+.minutes .mh { display: flex; gap: 1.2rem; align-items: center; margin-bottom: 1rem; }
+.minutes .mh img { width: 96px; height: auto; }
+.minutes .club { font-size: .85rem; letter-spacing: .03em; color: #445; }
+.minutes h1 { margin: .1rem 0; font-size: 1.7rem; }
+.minutes .date { font-size: 1.15rem; }
+.minutes .leader { color: #445; font-size: .9rem; }
+.minutes h2 { background: #c3d69b; font-size: 1rem; margin: 1.1rem 0 .4rem; padding: .15rem .4rem; }
+.minutes h2 .count { font-weight: normal; float: right; }
+.minutes .att { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1rem; margin: 0; }
+.minutes .att dt { font-weight: bold; } .minutes .att dd { margin: 0; }
+.minutes ul.items { margin: 0; padding-left: 1.2rem; } .minutes ul.items li { margin: .3rem 0; }
+.minutes .who { font-size: .75rem; background: #eef3e0; border-radius: .6rem; padding: 0 .4rem; text-decoration: none; color: #364; }
+.minutes .cs { font-family: monospace; }
+.minutes .links ul { padding-left: 1.2rem; font-size: .9rem; } .minutes .ver { font-size: .8rem; color: #667; }
+.minutes a { color: #1a4fa0; word-break: break-all; }
+.muted { color: #667; }
+body.pdf { margin: 0; } @page { size: letter; margin: .7in; }
+body.pdf .minutes h2 { break-after: avoid; }

@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}Minutes {{ m.date }}{% endblock %}{% block body %}
+<div class="actions">
+  <a class="btn" href="/meetings/{{ m.slug }}/minutes.pdf">Download PDF</a>
+  {% if has_original %}<a class="btn ghost" href="/meetings/{{ m.slug }}/original.pdf">View original</a>{% endif %}
+</div>
+{% include "_minutes.html" %}
+{% endblock %}

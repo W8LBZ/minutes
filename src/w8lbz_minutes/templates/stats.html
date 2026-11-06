@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block body %}
+<h1>Attendance</h1>
+<p>{{ s.count }} meetings on record, averaging {{ '%.1f'|format(s.avg) }} people per meeting (members and guests).</p>
+<div class="cols">
+<section><h2>Per meeting</h2>
+<table class="list"><thead><tr><th>Date</th><th class="n">In person</th><th class="n">Teams</th><th class="n">Guests</th><th class="n">Total</th></tr></thead>
+<tbody>{% for r in s.rows %}<tr><td><a href="/meetings/{{ r.meeting.slug }}">{{ r.meeting.date }}</a></td>
+<td class="n">{{ r.in_person }}</td><td class="n">{{ r.remote }}</td><td class="n">{{ r.guests }}</td><td class="n"><b>{{ r.total }}</b></td></tr>{% endfor %}</tbody></table>
+</section>
+<section><h2>Per member</h2>
+<table class="list"><thead><tr><th>Member</th><th class="n">In person</th><th class="n">Teams</th><th class="n">Rate</th><th>Last</th></tr></thead>
+<tbody>{% for r in s.members %}<tr><td><a href="/members/{{ r.id }}">{{ r.name }}</a></td>
+<td class="n">{{ r.in_person }}</td><td class="n">{{ r.remote }}</td><td class="n">{{ '%.0f'|format(r.rate*100) }}%</td><td>{{ r.last }}</td></tr>{% endfor %}</tbody></table>
+</section></div>
+{% endblock %}
