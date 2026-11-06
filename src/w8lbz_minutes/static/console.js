@@ -11,7 +11,7 @@
     "Old Business": "Carried forward from last meeting (its Old and New Business). Delete what's finished, update the rest.",
     "Upcoming Events": "Carried forward from last meeting. Delete past events, add new ones.",
     "Winners": "e.g. “50/50 drawing – Jim F $7.50” and “Weekly drawing – Dave G, not registered (up to $62)”.",
-    "Upcoming Chow": "Leave it empty to show “See the attached chow list”.",
+    "Upcoming Chow": "Filled from the chow schedule when the meeting started. Chow changes made tonight are added to the minutes when you submit.",
   };
   const RECENT_GUESTS = 8; // quick-pick buttons; older guests are in the name field's autocomplete
   // A guest on their Nth visit or later gets a reminder to invite them to apply for membership.
@@ -237,7 +237,39 @@
     const motion = sec === "New Business" || sec === "Old Business" ? h("button", { class: "btn small ghost", onclick: () => {
       arr.push("Motion: ___ moved to ___, seconded by ___. Passed."); set(arr); render(); save(); } }, "+ Motion") : null;
     const hint = [HINTS[sec], sec === "Upcoming Chow" ? null : EMPTY_NOTE].filter(Boolean).join(" ");
-    return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, hint), rows, motion);
+    return h("div", {}, h("h2", {}, sec), sec === "Upcoming Chow" ? chowPanel() : null, h("p", { class: "hint" }, hint), rows, motion);
+  }
+
+  // ---------- chow tonight: did the scheduled member provide it? ----------
+  function chowPanel() {
+    const C = D.chow;
+    const box = h("div", { class: "chowbox" });
+    const post = async (data) => {
+      const r = await fetch("/chow/record", { method: "POST", headers: { Accept: "application/json" },
+        body: new URLSearchParams({ date: C.date, ...data }) });
+      if (!r.ok) { alert((await r.json()).error || "Couldn't save"); return; }
+      Object.assign(C, data); draw();
+    };
+    const draw = () => {
+      if (!C.member) { box.replaceChildren(h("b", {}, "Chow tonight: "), C.status === "none" ? "no chow tonight." : "nobody was scheduled. ",
+        h("a", { href: "/chow", target: "_blank" }, "Chow schedule")); return; }
+      const cover = h("select", {}, h("option", { value: "" }, "Covered by…"),
+        D.members.filter((m) => m.id !== C.member).map((m) => h("option", { value: m.id, selected: m.id === C.covered_by }, m.name)));
+      const note = h("input", { placeholder: "e.g. pizza delivered", value: C.note || "", size: 18 });
+      const done = { provided: "✓ provided", missed: "✗ missed", covered: "covered" }[C.status];
+      box.replaceChildren(
+        h("div", {}, h("b", {}, "Chow tonight: "), C.name, done ? h("span", { class: "badge" }, " " + done) : null,
+          C.status === "covered" && C.covered_by ? ` by ${people[C.covered_by]?.name || C.covered_by}` : ""),
+        h("div", { class: "row" },
+          h("button", { class: "btn small", onclick: () => post({ status: "provided" }) }, "Provided"),
+          h("button", { class: "btn small ghost", onclick: () => { if (confirm(`Mark chow missed by ${C.name}? (Bylaws VII.F: $35 added to dues.)`)) post({ status: "missed" }); } }, "Missed"),
+          cover, note,
+          h("button", { class: "btn small ghost", onclick: () => { if (!cover.value) return alert("Pick who covered it."); post({ status: "covered", covered_by: cover.value, note: note.value }); } }, "Covered"),
+          C.status && C.status !== "scheduled" ? h("button", { class: "btn small ghost", title: "Clear", onclick: () => post({ status: "scheduled" }) }, "Undo") : null),
+        h("div", { class: "hint" }, C.next ? `Next: ${C.next}. ` : "", h("a", { href: "/chow", target: "_blank" }, "Swap or change the schedule")));
+    };
+    draw();
+    return box;
   }
 
   // ---------- review & submit ----------

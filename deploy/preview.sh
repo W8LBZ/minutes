@@ -5,8 +5,8 @@
 #   deploy/preview.sh --stop BRANCH   stop it and delete its copy
 #   deploy/preview.sh --list          show running previews
 #
-# Each preview gets its own checkout and its own copy of data/ (the meetings and roster cache; never
-# the login database). It runs in preview mode: email goes to an outbox page instead of being sent,
+# Each preview gets its own checkout and its own copy of data/ (meetings, roster cache, chow schedule;
+# never the login database). It runs in preview mode: email goes to an outbox page instead of being sent,
 # and roster edits go to a local copy of the sheet. Ports start at 8100.
 set -euo pipefail
 REPO=$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)
@@ -41,8 +41,8 @@ fi
 # A fresh copy of the data each time; the preview keeps its own sign-ins (auth.sqlite) between updates.
 mkdir -p "$DIR/data"
 find "$DIR/data" -mindepth 1 -maxdepth 1 ! -name auth.sqlite -exec rm -rf {} +
-cp -r "$REPO/data/meetings" "$DIR/data/"
-cp "$REPO/data/roster.json" "$DIR/data/"
+# Everything in data/ (meetings, roster cache, chow schedule, ...) except the live login database.
+find "$REPO/data" -mindepth 1 -maxdepth 1 ! -name 'auth.sqlite*' ! -name 'preview-*' -exec cp -r {} "$DIR/data/" \;
 [ -f "$REPO/private/bylaws.md" ] && cp "$REPO/private/bylaws.md" "$DIR/data/"
 cp "$REPO/club.yaml" "$DIR/club.yaml"
 chmod -R go-rwx "$DIR/data" "$DIR/club.yaml"

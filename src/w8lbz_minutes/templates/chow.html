@@ -1,0 +1,101 @@
+{% extends "base.html" %}{% block title %}Chow{% endblock %}{% block body %}
+<h1>Chow schedule</h1>
+<p class="muted">Who brings the snack each meeting night. Can't make your night? Ask another member to swap below; they approve or decline here, and you both get an email.
+{% if leader %}Leaders can change the schedule directly; the Secretary keeps it.{% endif %}</p>
+{% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+
+{% for r in asked %}
+<div class="msg {{ 'ok' if r.with == me.id else '' }} swapreq">
+  {% if r.with == me.id %}
+    <b>{{ club.name(r.requester) }}</b> asks to swap: you'd bring chow on <b>{{ fmt(r.mine) }}</b> instead of {{ fmt(r.theirs) }}.
+    <form method="post" action="/chow/requests/{{ r.id }}/answer"><input type="hidden" name="approve" value="1"><button class="btn small">Approve</button></form>
+    <form method="post" action="/chow/requests/{{ r.id }}/answer"><input type="hidden" name="approve" value="0"><button class="btn small ghost">Decline</button></form>
+  {% else %}
+    You asked {{ club.name(r.with) }} to take {{ fmt(r.mine) }} for their {{ fmt(r.theirs) }}; waiting for an answer.
+    <form method="post" action="/chow/requests/{{ r.id }}/answer"><input type="hidden" name="approve" value="0"><button class="btn small ghost">Cancel request</button></form>
+  {% endif %}
+</div>
+{% endfor %}
+
+<table class="list chow"><thead><tr><th>Night</th><th>Chow</th><th></th></tr></thead><tbody>
+{% for d, x in upcoming %}<tr class="{{ 'mine' if x.member == me.id }}{{ ' none' if x.status == 'none' }}">
+  <td data-sort="{{ d }}">{{ fmt(d) }}{% if d == today %} <span class="badge">tonight</span>{% endif %}</td>
+  <td>{% if x.status == 'none' %}<span class="muted">No chow{% if x.note %} ({{ x.note }}){% endif %}</span>
+      {% elif x.member %}<a href="/members/{{ x.member }}">{{ club.name(x.member) }}</a>{% if x.member == me.id %} <span class="badge">you</span>{% endif %}
+      {% else %}<span class="muted">(open)</span>{% endif %}</td>
+  <td class="actions">
+    {% if x.member and x.member != me.id and mine and x.status != 'none' %}
+    <form method="post" action="/chow/request" class="inline"><input type="hidden" name="theirs" value="{{ d }}">
+      <select name="mine" aria-label="Your night to give">{% for md in mine %}<option value="{{ md }}">my {{ fmt(md) }}</option>{% endfor %}</select>
+      <button class="btn small ghost">Ask to swap</button></form>{% endif %}
+    {% if leader %}<details class="edit"><summary>Change</summary>
+      <form method="post" action="/chow/assign" class="inline"><input type="hidden" name="date" value="{{ d }}">
+        <select name="member"><option value="">(open)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == x.member }}>{{ m.name }}</option>{% endfor %}</select>
+        <button class="btn small">Assign</button></form>
+      <form method="post" action="/chow/none" class="inline"><input type="hidden" name="date" value="{{ d }}">
+        <input name="note" placeholder="Why (e.g. holiday)" value="{{ x.note if x.status == 'none' else '' }}" size="14">
+        <button class="btn small ghost">No chow this night</button></form>
+    </details>{% endif %}
+  </td></tr>
+{% else %}<tr><td colspan="3" class="muted">Nothing scheduled yet.</td></tr>{% endfor %}
+</tbody></table>
+
+{% if leader %}
+<h2>Swap two nights</h2>
+<form method="post" action="/chow/swap" class="inline">
+  {% for f in ('a', 'b') %}<select name="{{ f }}" aria-label="Night">{% for d, x in upcoming if x.member and x.status != 'none' %}<option value="{{ d }}" {{ 'selected' if loop.index == (1 if f == 'a' else 2) }}>{{ fmt(d) }}: {{ club.short(x.member) }}</option>{% endfor %}</select>{% if f == 'a' %} ⇄ {% endif %}{% endfor %}
+  <button class="btn small">Swap</button>
+</form>
+<p class="hint">Both members and the Secretary are emailed. Changes made on a meeting night go into that meeting's minutes.</p>
+
+<h2>Fill the schedule</h2>
+<form method="post" action="/chow/generate" class="inline">
+  Fill open meeting nights through <input type="date" name="until" value="{{ default_until }}">, continuing the rotation with
+  <select name="next_member">{% for mid in s.order %}<option value="{{ mid }}" {{ 'selected' if mid == next_up }}>{{ club.name(mid) }}</option>{% endfor %}</select>
+  <button class="btn small">Fill</button>
+</form>
+<p class="hint">Holidays already marked "no chow" are skipped. Someone who can't do a night (see their limits below) keeps their turn and gets the next night they can do.</p>
+
+<h2 id="rotation">Rotation</h2>
+<p class="hint">The same order every round; new members go at the bottom.</p>
+<ol class="rotation">{% for mid in s.order %}{% set c = s.constraints.get(mid) %}<li>
+  <span class="who">{{ club.name(mid) }}{% if mid == next_up %} <span class="badge">next</span>{% endif %}</span>
+  {% if c %}<span class="muted small">{% if c.not_weeks %}not {{ c.not_weeks|join(', ') }}{{ ' week' }} of the month{% endif %}{% for a, b in c.away %} · away {{ fmt(a) }}–{{ fmt(b) }}{% endfor %}{% if c.note %} · {{ c.note }}{% endif %}</span>{% endif %}
+  <span class="ops">
+    {% for op, label in (('up', '↑'), ('down', '↓')) %}<form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="{{ op }}"><button class="btn small ghost" title="Move {{ op }}">{{ label }}</button></form>{% endfor %}
+    <details class="edit"><summary>Limits</summary>
+      <form method="post" action="/chow/constraints"><input type="hidden" name="member" value="{{ mid }}">
+        Can't do week: {% for w in range(1, 6) %}<label><input type="checkbox" name="not_weeks" value="{{ w }}" {{ 'checked' if c and w in c.not_weeks }}>{{ w }}</label> {% endfor %}<br>
+        Away from <input type="date" name="away_from" value="{{ c.away[0][0] if c and c.away }}"> to <input type="date" name="away_to" value="{{ c.away[0][1] if c and c.away }}"><br>
+        Note <input name="note" value="{{ c.note if c }}" size="24"> <button class="btn small">Save</button></form>
+      <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="remove"><button class="btn small ghost" onclick="return confirm('Take {{ club.name(mid) }} out of the rotation?')">Take out of rotation</button></form>
+    </details></span>
+</li>{% endfor %}</ol>
+{% if s.pending %}<h3>Not in the rotation yet</h3>
+<ul class="rotation">{% for mid in s.pending if mid in club.members %}<li><span class="who">{{ club.name(mid) }}</span>
+  <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="add"><button class="btn small ghost">Add at the bottom</button></form></li>{% endfor %}</ul>{% endif %}
+
+<h2>Past nights</h2>
+<table class="list"><thead><tr><th>Night</th><th>Scheduled</th><th>What happened</th></tr></thead><tbody>
+{% for d, x in past %}<tr><td data-sort="{{ d }}">{{ fmt(d) }}</td>
+  <td>{% if x.status == 'none' %}<span class="muted">No chow{% if x.note %} ({{ x.note }}){% endif %}</span>{% else %}{{ club.name(x.member) if x.member else '(open)' }}{% endif %}</td>
+  <td>{% if x.status == 'provided' %}✓ provided{% elif x.status == 'missed' %}<b class="missed">✗ missed</b>{% elif x.status == 'covered' %}covered by {{ club.name(x.covered_by) }}{% if x.note %} ({{ x.note }}){% endif %}{% elif x.status != 'none' %}<span class="muted">not recorded</span>{% endif %}
+    {% if x.member and x.status != 'none' %}<details class="edit"><summary>Record</summary>
+      <form method="post" action="/chow/record" class="inline"><input type="hidden" name="date" value="{{ d }}">
+        <select name="status"><option value="provided">Provided</option><option value="missed">Missed</option><option value="covered">Covered by…</option><option value="scheduled">Not recorded</option></select>
+        <select name="covered_by"><option value="">(who covered)</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select>
+        <input name="note" placeholder="note" size="12"><button class="btn small">Save</button></form></details>{% endif %}
+  </td></tr>{% endfor %}</tbody></table>
+
+<h2>Recent changes</h2>
+<ul class="results">{% for e in log %}<li><span class="muted small">{{ e.at|ts }} · {{ club.name(e.by) }}</span>
+  <div>{% if e.action == 'swap' %}Swapped {{ fmt(e.dates[0]) }} ({{ club.short(e.members[0]) }}) and {{ fmt(e.dates[1]) }} ({{ club.short(e.members[1]) }}){% if e.request %}, by request{% endif %}
+  {% elif e.action == 'assign' %}{{ fmt(e.date) }}: {{ club.short(e.old) if e.old else '(open)' }} → {{ club.short(e.new) if e.new else '(open)' }}
+  {% elif e.action == 'no_chow' %}{{ fmt(e.date) }}: no chow{% if e.note %} ({{ e.note }}){% endif %}
+  {% elif e.action == 'record' %}{{ fmt(e.date) }}: {{ e.status }}{% if e.covered_by %} by {{ club.short(e.covered_by) }}{% endif %}
+  {% elif e.action == 'generate' %}Filled {{ e.dates|length }} nights, {{ fmt(e.dates[0]) }} to {{ fmt(e.dates[-1]) }}
+  {% elif e.action == 'swap_request' %}{{ club.short(e.members[0]) }} asked {{ club.short(e.members[1]) }} to swap {{ fmt(e.dates[0]) }} / {{ fmt(e.dates[1]) }}
+  {% else %}{{ e.action|replace('_', ' ') }}{% endif %}</div></li>
+{% else %}<li class="muted">No changes yet.</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

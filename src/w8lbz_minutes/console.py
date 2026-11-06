@@ -12,7 +12,7 @@ import logging
 import shutil
 import time
 
-from . import auth
+from . import auth, chow
 from .meeting import SECTIONS, Item, Meeting
 from .store import Archive
 
@@ -35,6 +35,9 @@ def start(archive: Archive, date: dt.date, leader: str | None) -> Meeting:
         # Last week's Old + New Business both become this week's Old Business.
         m.sections["Old Business"] = [Item(i.text) for i in prev.items("Old Business") + prev.items("New Business")]
         m.sections["Upcoming Events"] = [Item(i.text) for i in prev.items("Upcoming Events")]
+    # The next few chow nights after tonight, from the chow schedule.
+    later = [(d, x) for d, x in chow.upcoming(chow.load(), date + dt.timedelta(days=1), n=4)]
+    m.sections["Upcoming Chow"] = [Item(chow.describe(archive.club, d, x)) for d, x in later]
     m.save(archive.root)
     archive.reload()
     return archive.by_slug[m.slug]
@@ -90,6 +93,7 @@ def context(archive: Archive, m: Meeting) -> dict:
         "sections": SECTIONS,
         "invite_after": int(club.info.get("invite_after_visits", 3)),
         "email": {"roster": len(recipients(archive)), "only_to": club.email.get("only_to")},
+        "chow": chow_tonight(archive, m),
     }
 
 
@@ -117,6 +121,10 @@ def apply(archive: Archive, slug: str, data: dict) -> Meeting:
 
 def submit(archive: Archive, slug: str) -> Meeting:
     m = archive.by_slug[slug]
+    # Chow changes made on the meeting's date (swaps, cover, no-chow nights) go into its minutes.
+    have = {i.text for i in m.items("Upcoming Chow")}
+    notes = [n for n in chow.meeting_notes(chow.history(), archive.club, slug) if n not in have]
+    m.sections["Upcoming Chow"] = m.items("Upcoming Chow") + [Item(n) for n in notes]
     m.status = "published"
     m.save(archive.root)
     archive.reload()
@@ -170,3 +178,15 @@ def email_minutes(archive: Archive, slug: str, make_pdf, url: str) -> dict:
         status = {"at": int(time.time()), "error": str(e)}
     (archive.root / slug / "emailed.json").write_text(json.dumps(status))
     return status
+
+
+def chow_tonight(archive: Archive, m: Meeting) -> dict:
+    """Tonight's chow for the console panel, and the members who could have covered it."""
+    s = chow.load()
+    x = s["nights"].get(m.slug) or {}
+    nxt = chow.upcoming(s, m.date + dt.timedelta(days=1), n=1)
+    club = archive.club
+    return {"date": m.slug, "member": x.get("member"), "name": club.name(x["member"]) if x.get("member") else None,
+            "status": x.get("status", "scheduled") if x else None, "covered_by": x.get("covered_by"),
+            "note": x.get("note", ""), "next": chow.describe(club, *nxt[0]) if nxt else None,
+            "notes": chow.meeting_notes(chow.history(), club, m.slug)}

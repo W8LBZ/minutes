@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import logging
 import re
+import threading
 from importlib.metadata import metadata, requires, version
 from pathlib import Path
 from urllib.parse import quote
@@ -15,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import console, profile
+from . import chow, console, profile
 from .auth import Auth, _safe_next
 from .club import DATA, PREVIEW
 from .roster import SHAREABLE, SheetError
@@ -117,6 +118,7 @@ def officer(request: Request) -> str:
 def page(request: Request, name: str, **ctx) -> HTMLResponse:
     mid = getattr(request.state, "member", None)
     return templates.TemplateResponse(request, name, {
+        "club": archive.club,
         "me": archive.club.members.get(mid) if mid else None,
         "can_lead": (archive.club.can_lead(mid) or admin_mode(request)) if mid else False,
         "is_admin": archive.club.is_admin(mid), "admin_until": getattr(request.state, "admin_until", None),
@@ -187,6 +189,128 @@ def logout(request: Request):
 def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depends(me)):
     return page(request, "account.html", passkeys=authn.passkeys(mid), sessions=authn.sessions(mid),
                 welcome=welcome, next=_safe_next(next), passkey_host=request.url.hostname == authn.rp_id)
+
+
+# ---------------- chow list ----------------
+_chow_lock = threading.Lock()
+
+
+def can_edit_chow(request: Request) -> bool:
+    """Leaders (officers and minutes editors) and admins in admin mode; it's the Secretary's job day to day."""
+    return archive.club.can_lead(request.state.member) or admin_mode(request)
+
+
+def chow_change(request: Request, fn, back: str = "/chow"):
+    """Run fn(state) under the lock and save. ValueError -> shown on the Chow page."""
+    with _chow_lock:
+        s = chow.load()
+        try:
+            fn(s)
+        except ValueError as e:
+            if request.headers.get("accept", "").startswith("application/json"):
+                return JSONResponse({"error": str(e)}, status_code=409)
+            return RedirectResponse(f"{back}{'&' if '?' in back else '?'}error=" + quote(str(e)), status_code=303)
+        chow.save(s)
+    if request.headers.get("accept", "").startswith("application/json"):
+        return JSONResponse({"ok": True})
+    return RedirectResponse(back, status_code=303)
+
+
+def chow_leader(request: Request) -> str:
+    if not can_edit_chow(request):
+        raise HTTPException(403, "Only leaders can change the chow schedule.")
+    return request.state.member
+
+
+@app.get("/chow", response_class=HTMLResponse)
+def chow_page(request: Request, error: str = "", mid: str = Depends(me)):
+    s, club = chow.load(), archive.club
+    leader = can_edit_chow(request)
+    members = sorted((m for m in club.members.values() if m.status.lower() not in ("inactive", "silent key")),
+                     key=lambda m: (m.last, m.first))
+    today = dt.date.today()
+    return page(request, "chow.html", s=s, error=error, leader=leader, members=members,
+                upcoming=chow.upcoming(s, n=16), past=chow.past(s, n=16) if leader else [],
+                mine=[d for d, x in chow.upcoming(s, n=60) if x.get("member") == mid and x.get("status") != "none"],
+                asked=[r for r in s["swaps"] if r["status"] == "pending" and mid in (r["with"], r["requester"])],
+                next_up=chow.next_up(club, s), today=today.isoformat(),
+                default_until=(today + dt.timedelta(days=180)).isoformat(),
+                log=chow.history(30) if leader else [], fmt=lambda d: dt.date.fromisoformat(d).strftime("%a %b %-d"))
+
+
+@app.post("/chow/request")
+def chow_request(request: Request, mine: str = Form(...), theirs: str = Form(...), mid: str = Depends(me)):
+    return chow_change(request, lambda s: chow.request_swap(archive.club, s, mid, mine, theirs, base_url(request)))
+
+
+@app.post("/chow/requests/{rid}/answer")
+def chow_answer(request: Request, rid: str, approve: int = Form(0), mid: str = Depends(me)):
+    return chow_change(request, lambda s: chow.decide_swap(archive.club, s, rid, mid, bool(approve), base_url(request)))
+
+
+@app.post("/chow/assign")
+def chow_assign(request: Request, date: str = Form(...), member: str = Form(""), mid: str = Depends(chow_leader)):
+    dt.date.fromisoformat(date)
+    return chow_change(request, lambda s: chow.assign(archive.club, s, date, member or None, mid, base_url(request)))
+
+
+@app.post("/chow/none")
+def chow_none(request: Request, date: str = Form(...), note: str = Form(""), mid: str = Depends(chow_leader)):
+    dt.date.fromisoformat(date)
+    return chow_change(request, lambda s: chow.set_none(s, date, note, mid))
+
+
+@app.post("/chow/swap")
+def chow_swap(request: Request, a: str = Form(...), b: str = Form(...), mid: str = Depends(chow_leader)):
+    return chow_change(request, lambda s: chow.swap(archive.club, s, a, b, mid, base_url(request)))
+
+
+@app.post("/chow/record")
+def chow_record(request: Request, date: str = Form(...), status: str = Form(...), covered_by: str = Form(""),
+                note: str = Form(""), next: str = Form("/chow"), mid: str = Depends(chow_leader)):
+    return chow_change(request, lambda s: chow.record(archive.club, s, date, status, mid, covered_by or None, note),
+                       back=_safe_next(next))
+
+
+@app.post("/chow/generate")
+def chow_generate(request: Request, until: str = Form(...), next_member: str = Form(""), mid: str = Depends(chow_leader)):
+    def run(s):
+        if next_member:
+            s["next"] = next_member
+        if not chow.generate(archive.club, s, dt.date.fromisoformat(until), mid):
+            raise ValueError("No open meeting nights to fill before that date.")
+    return chow_change(request, run)
+
+
+@app.post("/chow/order")
+def chow_order(request: Request, member: str = Form(...), op: str = Form(...), mid: str = Depends(chow_leader)):
+    """Rotation order: move a member up or down, add a waiting member at the bottom, or take one out."""
+    def run(s):
+        order = list(s["order"])
+        if op == "add" and member in archive.club.members and member not in order:
+            order.append(member)
+        elif op == "remove" and member in order:
+            order.remove(member)
+            s["pending"].append(member)
+        elif op in ("up", "down") and member in order:
+            i = order.index(member)
+            j = i - 1 if op == "up" else i + 1
+            if 0 <= j < len(order):
+                order[i], order[j] = order[j], order[i]
+        chow.set_order(s, order, mid)
+    return chow_change(request, run, back="/chow#rotation")
+
+
+@app.post("/chow/constraints")
+async def chow_constraints(request: Request, mid: str = Depends(chow_leader)):
+    form = await request.form()
+    who = form.get("member", "")
+    if who not in archive.club.members:
+        raise HTTPException(404)
+    weeks = [int(w) for w in form.getlist("not_weeks") if w.isdigit()]
+    away = [[form.get("away_from", ""), form.get("away_to", "")]] if form.get("away_from") else []
+    return chow_change(request, lambda s: chow.set_constraints(s, who, weeks, away, form.get("note", ""), mid),
+                       back="/chow#rotation")
 
 
 # ---------------- admin mode ----------------
