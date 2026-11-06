@@ -6,6 +6,9 @@
 set -euo pipefail
 REPO=${REPO:-https://github.com/W8LBZ/minutes.git}
 APP=/opt/w8lbz-minutes CONF=/etc/w8lbz-minutes DATA=/var/lib/w8lbz-minutes
+TZ_NAME=${TZ_NAME:-America/New_York}  # the club's local time: "today" in the console depends on it
+
+timedatectl set-timezone "$TZ_NAME" 2>/dev/null || ln -sf "/usr/share/zoneinfo/$TZ_NAME" /etc/localtime
 
 apt-get update -qq
 # git/curl: deploy; pango + fonts: PDF rendering (WeasyPrint)
