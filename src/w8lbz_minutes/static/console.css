@@ -29,3 +29,6 @@ textarea { resize: vertical; min-height: 2.4rem; }
 .startform { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; } .startform label { display: flex; flex-direction: column; font-size: .9rem; }
 .startform input, .startform select { font: inherit; padding: .3rem; }
 .floor textarea { width: 100%; font: inherit; padding: .5rem; border: 1px solid #ccd; border-radius: .3rem; margin: .5rem 0; }
+.invite { display: inline-block; margin-left: .4rem; padding: 0 .45rem; border-radius: .6rem; background: #f7e7c0; color: #6a4a00; font-size: .75rem; }
+.mbtn .invite { margin: .2rem 0 0; }
+.invitebox { background: #f7e7c0; border-left: 4px solid #d9a520; border-radius: .4rem; padding: .6rem .8rem; margin: .5rem 0; font-weight: 600; color: #5a3d00; }
