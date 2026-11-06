@@ -17,10 +17,13 @@ Meeting-minutes assistant for W8LBZ. See [REQUIREMENTS.md](REQUIREMENTS.md).
 ```sh
 curl -LsSf https://astral.sh/uv/install.sh | sh     # once
 uv sync
+uv run w8lbz-minutes roster                          # sync people from the roster Google Sheet
 uv run w8lbz-minutes import archive                  # (re)build data/ from archive/
 uv run w8lbz-minutes serve --host 0.0.0.0 --port 8765
 uv run pytest -q
 ```
+The roster sync needs a Google service-account key at `private/google-service-account.json`. Share the sheet with the account's email as Viewer.
+
 PDF generation needs the system Pango library: `sudo apt install libpango-1.0-0 libpangoft2-1.0-0`.
 
 ## Config
