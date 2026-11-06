@@ -100,7 +100,9 @@ def _notify(club: Club, e: dict, url: str) -> None:
     if not to:
         return
     who, by = club.name(e["member"]), club.name(e["by"])
-    what = "\n".join(f"  {LABELS[f]}: {e['old'].get(f) or '(blank)'}  ->  {v or '(blank)'}" for f, v in e["new"].items())
+    def show(v):
+        return (v or "(blank)").replace("\n", " / ")
+    what = "\n".join(f"  {LABELS[f]}: {show(e['old'].get(f))}  ->  {show(v)}" for f, v in e["new"].items())
     action = f"{by} undid an earlier change to {who}'s roster details" if e.get("undoes") else (
         f"{who} updated their roster details" if e["by"] == e["member"] else f"{by} updated {who}'s roster details")
     body = (f"{action}. The roster sheet has been updated.\n\n{what}\n\n"

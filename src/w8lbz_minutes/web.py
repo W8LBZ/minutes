@@ -179,6 +179,12 @@ def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depe
 
 # ---------------- profile (own contact details and sharing) ----------------
 
+def clean_address(text: str) -> str:
+    """Keep the member's line breaks (the sheet stores addresses on several lines); tidy spaces and blank lines."""
+    lines = [" ".join(line.split()) for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return "\n".join(line for line in lines if line)[:200]
+
+
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, saved: int = 0, email_sent: str = "", error: str = "", mid: str = Depends(me)):
     return page(request, "profile.html", m=archive.club.members[mid], shareable=SHAREABLE,
@@ -189,7 +195,9 @@ def profile_page(request: Request, saved: int = 0, email_sent: str = "", error: 
 async def profile_save(request: Request, mid: str = Depends(me)):
     form = await request.form()
     m = archive.club.members[mid]
-    address = " ".join(form.get("address", "").split())[:200]  # one line, like the sheet
+    address = clean_address(form.get("address", ""))
+    if address == clean_address(m.address or ""):  # untouched: don't rewrite the sheet over spacing
+        address = m.address or ""
     try:
         bm, bd = int(form.get("bmonth") or 0), int(form.get("bday") or 0)
         birthday = f"{bm:02d}-{bd:02d}" if bm and bd and dt.date(2000, bm, bd) else ""

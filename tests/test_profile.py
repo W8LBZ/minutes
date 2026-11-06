@@ -165,3 +165,27 @@ def test_club_reloads_roster_after_a_sync(tmp_path, monkeypatch):
     cache.write_text(json.dumps([{"id": "kd8ccc", "first": "Bob", "last": "Member", "address": "9 Oak Ave"}]))
     os.utime(cache, (1, 2))  # a different mtime, as a sync would give
     assert c.refresh() and c.members["kd8ccc"].address == "9 Oak Ave"
+
+
+def test_multiline_addresses_keep_their_line_breaks(env, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    from w8lbz_minutes.store import Archive
+    club, sheet, fake, sent = env
+    assert web.clean_address(" 100 Main St  #12 \r\n\r\nAnytown, OH 44000 ") == "100 Main St #12\nAnytown, OH 44000"
+    fake.rows[2][4] = "100 Main St #12 \nAnytown, OH 44000"  # as typed in the sheet, trailing space included
+    club.members["kd8ccc"].address = fake.rows[2][4]
+    monkeypatch.setattr(web, "archive", Archive(root=profile.DATA, club=club))  # an empty archive in tmp_path
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "kd8ccc")
+    monkeypatch.setattr(web.profile, "Sheet", lambda: sheet)
+    c = TestClient(web.app)
+    page = c.get("/profile").text
+    assert "<textarea" in page and "#12 \nAnytown" in page  # shown on two lines
+    form = {"email": "bob@example.org", "phone": "419-555-0123", "address": "100 Main St #12\r\nAnytown, OH 44000",
+            "bmonth": "", "bday": ""}
+    assert c.post("/profile", data=form, follow_redirects=False).status_code == 303
+    assert fake.writes == [("D3", "419-555-0123")]  # the untouched address isn't rewritten
+    form["address"] = "100 Main St #13\r\nAnytown, OH 44000"
+    c.post("/profile", data=form, follow_redirects=False)
+    assert fake.rows[2][4] == "100 Main St #13\nAnytown, OH 44000"
+    assert "#13 / Anytown" in sent[-1][2]  # readable in the Secretary's email

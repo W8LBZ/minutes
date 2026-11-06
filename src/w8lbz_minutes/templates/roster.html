@@ -11,7 +11,7 @@
 <td>{{ m.license_class or '' }}</td><td>{{ m.role or '' }}</td>
 <td>{% if m.status != 'Active' %}<span class="badge">{{ m.status }}</span>{% else %}Active{% endif %}</td>
 <td data-sort="{{ since or '' }}">{{ since|listdate if since }}</td>
-<td class="contact">{% if m.email and see(m, 'email') %}<div><a href="mailto:{{ m.email }}">{{ m.email }}</a>{% if 'email' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}{% if m.phone and see(m, 'phone') %}<div><a href="tel:{{ m.phone }}">{{ m.phone }}</a>{% if 'phone' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}{{ detail(m, 'address', m.address) }}</td>
+<td class="contact">{% if m.email and see(m, 'email') %}<div><a href="mailto:{{ m.email }}">{{ m.email }}</a>{% if 'email' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}{% if m.phone and see(m, 'phone') %}<div><a href="tel:{{ m.phone }}">{{ m.phone }}</a>{% if 'phone' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}{% if m.address and see(m, 'address') %}<div class="addr">{{ m.address }}{% if 'address' not in m.share %} {{ lock }}{% endif %}</div>{% endif %}</td>
 <td data-sort="{{ m.birthday if m.birthday and see(m, 'birthday') else '' }}">{{ detail(m, 'birthday', m.birthday|monthday) }}</td>
 </tr>{% endfor %}</tbody></table>
 {% endblock %}

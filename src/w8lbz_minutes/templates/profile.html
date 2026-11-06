@@ -10,7 +10,7 @@ Your name, callsign and license class are kept by the Secretary; ask an officer 
   <label>Email <input type="email" name="email" value="{{ m.email or '' }}" autocomplete="email">
     <span class="hint">Also how you sign in. A change takes effect after you confirm it from the new address.</span></label>
   <label>Phone <input type="tel" name="phone" value="{{ m.phone or '' }}" maxlength="40" autocomplete="tel"></label>
-  <label>Address <input name="address" value="{{ m.address or '' }}" maxlength="200" autocomplete="street-address"></label>
+  <label>Address <textarea name="address" rows="3" maxlength="200" autocomplete="street-address">{{ m.address or '' }}</textarea></label>
   <fieldset><legend>Birthday <span class="hint">(month and day only; no year)</span></legend>
     {% set bm = m.birthday[:2]|int if m.birthday else 0 %}{% set bd = m.birthday[3:]|int if m.birthday else 0 %}
     <select name="bmonth" aria-label="Month"><option value="">Month</option>{% for i in range(1, 13) %}<option value="{{ i }}" {{ 'selected' if i == bm }}>{{ ['January','February','March','April','May','June','July','August','September','October','November','December'][i-1] }}</option>{% endfor %}</select>
