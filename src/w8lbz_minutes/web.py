@@ -267,6 +267,20 @@ def member(request: Request, mid: str):
                 total=len(archive.meetings))
 
 
+@app.get("/roster", response_class=HTMLResponse)
+def roster(request: Request):
+    """Members' public-to-members details only: no phone, address or email."""
+    def since(m):
+        try:
+            return dt.date.fromisoformat(m.member_since) if m.member_since else None
+        except ValueError:
+            return None
+    gone = ("inactive", "silent key")
+    ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
+    return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
+                active=sum(m.status.lower() not in gone for m in ms))
+
+
 @app.get("/stats", response_class=HTMLResponse)
 def stats(request: Request):
     return page(request, "stats.html", s=archive.stats())
