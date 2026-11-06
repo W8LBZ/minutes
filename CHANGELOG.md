@@ -5,6 +5,8 @@ What changed in each version of W8LBZ Minutes. Planned work is in [ROADMAP.md](R
 Versions follow [semantic versioning](https://semver.org): while the app is 0.x, the middle number goes up for new features and the last for fixes. Each version is a git tag (`v0.2.0`), and the app's footer shows the version that's running.
 
 ## Unreleased
+- **About page,** opened from a new menu under your name (with Your account and Sign out): version, credits, license, source code, what's new and the open-source packages the app uses. Replaces the version link in the footer.
+- **Licensed under the GNU AGPL, version 3 or later.** Copyright Jim Flattery.
 
 ## 0.2.0 (2026-11-06)
 - **Minutes are emailed on Submit:** the PDF goes to every active roster member with an address, one copy each, with Reply-To set to the leader. Test mode (`email.only_to`) is still on. Leaders see the result on the minutes page. (#7)

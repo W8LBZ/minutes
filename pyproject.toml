@@ -1,7 +1,10 @@
 [project]
 name = "w8lbz-minutes"
 version = "0.2.0"
-description = "Add your description here"
+description = "Meeting minutes, attendance and club records for the W8LBZ amateur radio club"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Jim Flattery" }]
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.162.0",

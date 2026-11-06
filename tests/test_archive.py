@@ -108,7 +108,7 @@ def test_archive_groups_by_year_and_pages(client):
     html = client.get("/").text
     assert "All 30 meetings from 2024" in html  # 2024 is cut at a page and links to its own view
     assert rows(html) == 26 + 2 + 1  # 2024 cut to one page, 2025, and this year
-    assert html.count("<details") == 3 and html.count("<details class=\"year\" open") == 1
+    assert html.count("<details class=\"year\"") == 3 and html.count("<details class=\"year\" open") == 1
     p1, p2 = client.get("/?year=2024").text, client.get("/?year=2024&page=2").text
     assert rows(p1) == 26 and rows(p2) == 4 and "Page 2 of 2" in p2
     assert rows(client.get("/?year=2024&page=99").text) == 4  # clamped to the last page
@@ -168,8 +168,12 @@ def test_link_icons():
     assert link_icon("https://example.org/some/page") == "link"
 
 
-def test_footer_shows_version(monkeypatch):
+def test_about_page(monkeypatch):
     from fastapi.testclient import TestClient
     from w8lbz_minutes import web
     monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
-    assert f"W8LBZ Minutes v{web.version('w8lbz-minutes')}" in TestClient(web.app).get("/links").text
+    c = TestClient(web.app)
+    html = c.get("/about").text
+    assert web.version("w8lbz-minutes") in html and "Jim Flattery, KO4CGQ" in html and "AGPL-3.0-or-later" in html
+    assert ">fastapi<" in html.lower() and "What's new" in html
+    assert 'href="/about"' in c.get("/links").text  # in the name menu on every page

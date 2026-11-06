@@ -4,7 +4,7 @@ nav.top { display: flex; gap: 1rem; align-items: center; padding: .5rem 1rem; ba
 nav.top a { color: #e8f0d8; text-decoration: none; } nav.top a:hover { text-decoration: underline; }
 nav.top .brand { font-weight: bold; display: flex; align-items: center; gap: .4rem; margin-right: 1rem; }
 nav.top .brand img { width: 28px; background: #fff; border-radius: 50%; }
-nav.top form { margin-left: auto; } nav.top input { padding: .35rem .6rem; border-radius: .3rem; border: 0; width: 16rem; }
+nav.top form { margin-left: auto; } nav.top input { padding: .35rem .6rem; border-radius: .3rem; border: 0; width: 13rem; }
 main { max-width: 64rem; margin: 1.5rem auto; padding: 0 1rem; }
 table.list { border-collapse: collapse; width: 100%; } .list th, .list td { padding: .3rem .5rem; border-bottom: 1px solid #e3e3dc; text-align: left; }
 .list .n { text-align: right; font-variant-numeric: tabular-nums; }
@@ -45,4 +45,13 @@ details.year > summary .muted { font-size: .9rem; font-weight: normal; }
 .linkcard:hover { background: #eef2e6; border-color: #2f3d1c; }
 .linkcard .ico { width: 2.6rem; height: 2.6rem; } .linkcard .label { font-weight: 600; }
 .linkcard .host { font-size: .8rem; color: #667; word-break: break-all; }
-footer.site { text-align: center; font-size: .8rem; padding: 2rem 0 1rem; } footer.site a { color: #889; text-decoration: none; }
+nav.top .menu { position: relative; } nav.top .menu summary { list-style: none; cursor: pointer; color: #e8f0d8; }
+nav.top .menu summary::-webkit-details-marker { display: none; }
+nav.top .drop { position: absolute; right: 0; top: 2rem; z-index: 10; min-width: 11rem; background: #fff; border: 1px solid #d9dccf;
+  border-radius: .5rem; box-shadow: 0 4px 14px rgba(0,0,0,.15); padding: .3rem 0; }
+nav.top .drop a, nav.top .drop button { display: block; width: 100%; padding: .45rem 1rem; color: #2f3d1c; text-align: left;
+  background: none; border: 0; font: inherit; cursor: pointer; }
+nav.top .drop a:hover, nav.top .drop button:hover { background: #eef2e6; text-decoration: none; }
+nav.top .drop form { margin: 0; border-top: 1px solid #e3e3dc; }
+.about dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1.2rem; } .about dt { color: #667; }
+.changelog h2 { font-size: 1.05rem; margin: 1.2rem 0 .3rem; } .changelog li { margin: .2rem 0; }

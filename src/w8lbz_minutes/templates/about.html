@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block title %}About{% endblock %}{% block body %}
+<div class="about">
+<h1>About W8LBZ Minutes</h1>
+<p>Meeting minutes, attendance and club records for the {{ club.info.name }} ({{ club.info.callsign }}).</p>
+<p>Created by <b>Jim Flattery, KO4CGQ</b>.</p>
+<dl>
+  <dt>Version</dt><dd>{{ VERSION }}</dd>
+  <dt>License</dt><dd><a href="https://github.com/W8LBZ/minutes/blob/main/LICENSE">{{ license }}</a>. Copyright © 2026 Jim Flattery.
+    Free software: you may use, change and share it, and anyone who runs a changed copy for others must share their source too.</dd>
+  <dt>Source code</dt><dd><a href="https://github.com/W8LBZ/minutes">github.com/W8LBZ/minutes</a></dd>
+</dl>
+
+{% if changelog %}<h2>What's new</h2>
+<div class="changelog">{{ changelog }}</div>{% endif %}
+
+<h2>Built with</h2>
+<p class="muted">Open-source software this app depends on directly, as installed on this server.</p>
+<table class="list"><thead><tr><th>Package</th><th>Version</th><th>License</th></tr></thead>
+<tbody>{% for d in deps %}<tr><td>{% if d.url %}<a href="{{ d.url }}">{{ d.name }}</a>{% else %}{{ d.name }}{% endif %}</td><td>{{ d.version }}</td><td>{{ d.license }}</td></tr>{% endfor %}</tbody></table>
+</div>
+{% endblock %}
