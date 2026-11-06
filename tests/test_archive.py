@@ -67,3 +67,15 @@ def test_membership_log():
                     {"callsign": "", "full_name": "Old Timer", "date": "", "event": "Silent Key"}])
     assert ms[0]["officer"] and ms[0]["member_since"] == "2026-01-21"
     assert ms[1]["id"] == "old-timer" and ms[1]["events"][0]["event"] == "Silent Key"
+
+
+def test_bylaws_page(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    monkeypatch.setattr(web, "DATA", tmp_path)
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    c = TestClient(web.app)
+    assert "haven't been added yet" in c.get("/bylaws").text
+    (tmp_path / "bylaws.md").write_text("# Constitution\n\n### Article I\n\n**A.** Meetings <b>weekly</b>.")
+    html = c.get("/bylaws").text
+    assert "<h1>Constitution</h1>" in html and "<strong>A.</strong>" in html

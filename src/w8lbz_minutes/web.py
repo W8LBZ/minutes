@@ -16,6 +16,7 @@ from markupsafe import Markup, escape
 
 from . import console
 from .auth import Auth, _safe_next
+from .club import DATA
 from .meeting import SECTIONS
 from .store import Archive
 
@@ -265,6 +266,15 @@ def member(request: Request, mid: str):
         raise HTTPException(404)
     return page(request, "member.html", member=archive.club.members[mid], h=archive.member_history(mid),
                 total=len(archive.meetings))
+
+
+@app.get("/bylaws", response_class=HTMLResponse)
+def bylaws(request: Request):
+    """The club's constitution and bylaws, from bylaws.md in the data directory (not in this public repo)."""
+    import markdown
+    p = DATA / "bylaws.md"
+    html = Markup(markdown.markdown(p.read_text())) if p.exists() else None
+    return page(request, "bylaws.html", html=html)
 
 
 @app.get("/stats", response_class=HTMLResponse)

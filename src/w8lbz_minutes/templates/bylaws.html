@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Bylaws{% endblock %}{% block body %}
+{% if html %}<article class="minutes bylaws">{{ html }}</article>
+{% else %}<p class="muted">The bylaws haven't been added yet. An admin puts them in <code>bylaws.md</code> in the data directory.</p>{% endif %}
+{% endblock %}
