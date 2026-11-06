@@ -43,3 +43,8 @@ def test_ambiguous_first_name():
 def test_file_date():
     assert str(file_date("29-jan-26-minutes-R1JCmreIiha6nmwZ.pdf")) == "2026-01-29"
     assert str(file_date("10-sept-26-minutes.pdf")) == "2026-09-10"
+
+
+def test_permissions_and_possessives():
+    assert club.can_lead("doe") and not club.can_lead("kim")
+    assert club.speaker_of("Sams antenna fell down") == "kim"

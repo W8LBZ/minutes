@@ -1,8 +1,9 @@
 """Roster sync from the club's Google Sheet, the single source of truth for people.
 
 Reads columns by header name, so adding or reordering columns doesn't break it.
-Optional columns used if present: short_name, aliases (comma-separated spellings
-seen in old minutes), minutes_role (leader / editor), status (active / SK / ...).
+Columns used: callsign, full_name, email, Title(s), is_officer, is_board, Class,
+minutes_editor (may lead meetings and edit minutes), Status (Active / Inactive /
+Silent Key / Prospect) and aliases (comma-separated spellings seen in old minutes).
 
 Only the fields the app needs are cached (no phone or address).
 """
@@ -69,10 +70,9 @@ def to_members(rows: list[dict[str, str]]) -> list[dict]:
             "officer": _truthy(r.get("is_officer", "")),
             "board": _truthy(r.get("is_board", "")),
             "license_class": r.get("class", "").strip() or None,
-            "short": r.get("short_name", "").strip() or None,
             "aliases": _split(r.get("aliases", "")),
-            "minutes_role": r.get("minutes_role", "").strip().lower() or None,
-            "status": (r.get("status", "").strip().lower() or "active"),
+            "minutes_editor": _truthy(r.get("minutes_editor", "")),
+            "status": r.get("status", "").strip() or "Active",
         })
     return out
 

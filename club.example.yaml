@@ -19,7 +19,4 @@ roster:  # the club roster Google Sheet (share it with the service account as Vi
 privacy:
   never_record: []  # names never shown in minutes or the archive
 
-# People come from the roster Google Sheet (`w8lbz-minutes roster`).
-# Temporary overrides, keyed by lowercase callsign, for columns the sheet lacks:
-overrides:
-  kd8xyz: {minutes_role: leader, aliases: [Doh]}
+# People come only from the roster Google Sheet (`w8lbz-minutes roster`).

@@ -1,8 +1,7 @@
 """Club config and people.
 
-People come from the roster Google Sheet (synced to data/roster.json by `w8lbz-minutes roster`).
-club.yaml (local only, never in git) holds app settings plus temporary per-member
-`overrides` for things the sheet has no column for yet (short_name, aliases, minutes_role).
+People come only from the roster Google Sheet (synced to data/roster.json by
+`w8lbz-minutes roster`). club.yaml (local only, never in git) holds app settings.
 """
 from __future__ import annotations
 
@@ -37,8 +36,8 @@ class Member:
     officer: bool = False
     board: bool = False
     license_class: str | None = None
-    minutes_role: str | None = None  # leader | editor
-    status: str = "active"
+    minutes_editor: bool = False  # may lead meetings and edit minutes (officers always may)
+    status: str = "Active"
     aliases: list[str] = field(default_factory=list)
 
     @property
@@ -61,7 +60,6 @@ class Club:
         known = {f.name for f in fields(Member)}
         self.members: dict[str, Member] = {}
         for d in roster or []:
-            d = {**d, **((cfg.get("overrides") or {}).get(d["id"]) or {})}
             self.members[d["id"]] = Member(**{k: v for k, v in d.items() if k in known})
         self._auto_short_names()
 
@@ -77,12 +75,11 @@ class Club:
 
     # ---- permissions ----
     def can_lead(self, mid: str) -> bool:
+        """Officers and members ticked minutes_editor may lead a meeting and edit minutes."""
         m = self.members.get(mid)
-        return bool(m and (m.officer or m.minutes_role == "leader"))
+        return bool(m and (m.officer or m.minutes_editor))
 
-    def can_edit(self, mid: str) -> bool:
-        m = self.members.get(mid)
-        return bool(m and (self.can_lead(mid) or m.minutes_role == "editor"))
+    can_edit = can_lead
 
     @property
     def leaders(self) -> list[str]:
@@ -119,13 +116,13 @@ class Club:
             if not m.first:
                 continue
             firsts.setdefault(m.first.lower(), []).append(m.id)
-            pats.append((rf"{m.first}\s+{m.last}", m.id))
+            pats.append((rf"{m.first}(?:'?s)?\s+{m.last}", m.id))
             pats.append((rf"{m.first}(?:'s)?\s+{m.last[0]}\b\.?", m.id))  # "Chris D", "Chris's K"
             for a in m.aliases:
                 pats.append((rf"{a}\b", m.id))
         for first, ids in firsts.items():
             if len(ids) == 1:
-                pats.append((rf"{first}\b", ids[0]))
+                pats.append((rf"{first}(?:'?s)?\b", ids[0]))  # "Mike", "Mikes", "Mike's"
         return [(re.compile(rf"^\s*{p}", re.I), mid) for p, mid in pats]
 
     def speaker_of(self, text: str, present: list[str] | None = None) -> str | None:
