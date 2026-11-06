@@ -75,4 +75,13 @@ def test_links_page_lists_club_links(monkeypatch):
     monkeypatch.setattr(web.archive.club, "links", [{"label": "Club Discord", "url": "https://discord.example/x"}])
     monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
     html = TestClient(web.app).get("/links").text
-    assert '<a href="https://discord.example/x">Club Discord</a>' in html and 'href="/links"' in html
+    assert 'href="https://discord.example/x"' in html and "Club Discord" in html and 'href="/links"' in html
+
+
+def test_link_icons():
+    from w8lbz_minutes.web import link_icon
+    assert link_icon("https://teams.live.com/meet/1?p=x") == "video"
+    assert link_icon("https://discord.com/invite/abc") == "chat"
+    assert link_icon("https://minutes.example.ts.net/bylaws") == "document"
+    assert link_icon("https://w8lbz.org") == "globe"
+    assert link_icon("https://example.org/some/page") == "link"

@@ -20,7 +20,8 @@ email:
   # Everything else is withheld and logged. Remove only_to to email members for real.
   only_to: [KD8XYZ]
 
-links:  # shown in the "Club Links" footer of the minutes
+links:  # shown in the "Club Links" footer of the minutes and on the Links page
+  # Optional icon: video, chat, globe, document, radio, calendar or link (guessed from the address if left out)
   - label: Teams meeting
     url: https://teams.live.com/meet/REPLACE_ME
   - label: Club Discord
