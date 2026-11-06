@@ -1,11 +1,25 @@
 {% extends "base.html" %}{% block body %}
-<h1>Meeting minutes</h1>
+<div class="headrow"><h1>Meeting minutes</h1>
+<form class="filter"><label>Year <select name="year" onchange="this.form.submit()">
+  <option value="">All years</option>{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+</select></label><noscript><button class="btn small">Show</button></noscript></form></div>
+{% for y, meetings, total in groups %}
+<details class="year" {{ 'open' if y == open_year }}>
+<summary>{{ y }} <span class="muted">{{ total }} meeting{{ 's' if total != 1 }}</span></summary>
 <table class="list">
 <thead><tr><th>Date</th><th class="n">In person</th><th class="n">Online</th><th class="n">Guests</th><th>Status</th></tr></thead>
 <tbody>{% for m in meetings %}
 <tr><td data-sort="{{ m.slug }}"><a href="/meetings/{{ m.slug }}">{{ m.date|listdate }}</a></td>
 <td class="n">{{ m.in_person|length }}</td><td class="n">{{ m.remote|length }}</td><td class="n">{{ m.guests|length }}</td>
 <td>{% if m.status == 'draft' %}<a class="badge warn" href="/console/{{ m.slug }}">in progress</a>{% elif m.status == 'imported' %}<span class="badge warn">imported, unreviewed</span>{% else %}<span class="badge">{{ m.status }}</span>{% endif %}</td></tr>
-{% else %}<tr><td colspan="5">No minutes yet. Run <code>w8lbz-minutes import archive</code>.</td></tr>{% endfor %}</tbody>
+{% endfor %}</tbody>
 </table>
+{% if not year and total > meetings|length %}<p><a href="/?year={{ y }}">All {{ total }} meetings from {{ y }} →</a></p>{% endif %}
+{% if year and pages > 1 %}<p class="pager">
+  {% if p > 1 %}<a class="btn small ghost" href="/?year={{ y }}&page={{ p - 1 }}">◀ Newer</a>{% endif %}
+  Page {{ p }} of {{ pages }}
+  {% if p < pages %}<a class="btn small ghost" href="/?year={{ y }}&page={{ p + 1 }}">Older ▶</a>{% endif %}
+</p>{% endif %}
+</details>
+{% else %}<p>No minutes yet. Run <code>w8lbz-minutes import archive</code>.</p>{% endfor %}
 {% endblock %}
