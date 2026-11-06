@@ -84,6 +84,7 @@ def context(archive: Archive, m: Meeting) -> dict:
         "guest_history": guests,
         "past_guests": sorted(past, key=lambda g: (g["last"], g["visits"]), reverse=True),
         "sections": SECTIONS,
+        "invite_after": int(club.info.get("invite_after_visits", 3)),
     }
 
 

@@ -14,6 +14,10 @@
     "Upcoming Chow": "Leave it empty to show “See the attached chow list”.",
   };
   const RECENT_GUESTS = 8; // quick-pick buttons; older guests are in the name field's autocomplete
+  // A guest on their Nth visit or later gets a reminder to invite them to apply for membership.
+  const visitNo = (g) => { const p = D.guest_history[key(g.callsign)] || D.guest_history[key(g.name)]; return p && !p.member ? p.visits + 1 : 1; };
+  const inviteDue = (g) => visitNo(g) >= D.invite_after;
+  const INVITE = "Invite them to apply for membership";
   const ordinal = (n) => n + (["th", "st", "nd", "rd"][(n % 100 - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
   const panel = document.getElementById("panel");
   const saved = document.getElementById("saved");
@@ -125,7 +129,7 @@
     const gname = h("input", { type: "text", placeholder: "Guest name", list: "pastguests", autocomplete: "off", oninput: () => {
       const g = D.guest_history[key(gname.value)];
       guestInfo.textContent = !g ? "" : g.member ? `${g.name} is a member now. Mark them above instead.`
-        : `${g.name}${g.callsign ? " " + g.callsign : ""}: visit #${g.visits + 1} (last ${g.last})` + (g.visits >= 2 ? ". Invite to join?" : "");
+        : `${g.name}${g.callsign ? " " + g.callsign : ""}: ${ordinal(g.visits + 1)} visit (last ${g.last})` + (g.visits + 1 >= D.invite_after ? `. ${INVITE}.` : "");
       if (g && g.callsign && !gcall.value) gcall.value = g.callsign;
     } });
     const gcall = h("input", { type: "text", placeholder: "Callsign", size: 9 });
@@ -148,9 +152,11 @@
       h("h2", { style: "margin-top:1.4rem" }, "Guests"),
       recent.length ? [h("p", { class: "hint" }, "Recent guests: tap to add or remove. Type below for anyone else."),
         h("div", { class: "grid" }, recent.map((g) => h("button", { class: "mbtn " + (here(g) ? "inperson" : ""), onclick: () => toggleGuest(g) },
-          g.name, h("small", {}, [g.callsign, `${g.visits} visit${g.visits > 1 ? "s" : ""}`, here(g) ? "here" : ""].filter(Boolean).join(" · ")))))] : null,
+          g.name, h("small", {}, [g.callsign, `${g.visits} visit${g.visits > 1 ? "s" : ""}`, here(g) ? "here" : ""].filter(Boolean).join(" · ")),
+          g.visits + 1 >= D.invite_after ? h("span", { class: "invite" }, "invite to join") : null)))] : null,
       datalist,
-      M.guests.map((g, i) => h("div", { class: "row" }, h("span", { style: "flex:1" }, `${g.name} ${g.callsign || ""} ${g.notes ? "(" + g.notes + ")" : ""}`),
+      M.guests.map((g, i) => h("div", { class: "row" }, h("span", { style: "flex:1" }, `${g.name} ${g.callsign || ""} ${g.notes ? "(" + g.notes + ")" : ""}`,
+          inviteDue(g) ? h("span", { class: "invite" }, "invite to join") : null),
         h("button", { class: "btn small ghost", onclick: () => { M.guests.splice(i, 1); render(); save(); } }, "Remove"))),
       h("div", { class: "row" }, gname, gcall, gnote, h("button", { class: "btn small", onclick: add }, "Add guest")),
       guestInfo,
@@ -190,6 +196,8 @@
       ta.value = S.reports[k] || "";
       floor = h("div", { class: "floor" },
         h("h3", {}, `${fullName(k)} has the floor`),
+        k.startsWith("g:") && inviteDue(M.guests.find((g) => "g:" + g.name === k) || { name: k.slice(2) })
+          ? h("div", { class: "invitebox" }, `This is ${k.slice(2).split(" ")[0]}'s ${ordinal(visitNo(M.guests.find((g) => "g:" + g.name === k)))} visit. ${INVITE}.`) : null,
         past.length ? h("div", {}, h("div", { class: "hint" }, "Follow up on what they said before:"),
           past.map(([d, t]) => h("div", { class: "past" }, h("b", {}, d + ": "), t))) : h("p", { class: "hint" }, k.startsWith("g:") ? "Guest: ask what brought them in, and their license and callsign." : "No earlier reports on record."),
         ta,
@@ -239,8 +247,10 @@
       const r = await fetch(`/api/meetings/${M.slug}/live`); box.className = ""; box.innerHTML = await r.text();
     });
     const missing = present().filter((k) => !S.done.includes(k));
+    const invites = M.guests.filter(inviteDue);
     return h("div", {},
       h("h2", {}, "Review"),
+      invites.length ? h("div", { class: "invitebox" }, `Before closing: invite ${invites.map((g) => `${g.name} (${ordinal(visitNo(g))} visit)`).join(", ")} to apply for membership.`) : null,
       missing.length ? h("p", { class: "hint" }, `No report recorded for: ${missing.map(label).join(", ")}.`) : null,
       h("p", {}, h("button", { class: "btn warn", onclick: async () => {
         if (!confirm("Submit these minutes? They will be published to the archive.")) return;
