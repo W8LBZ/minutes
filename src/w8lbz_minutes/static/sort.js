@@ -1,4 +1,4 @@
-// Click a column header in any table.list to sort by it (numbers numerically, text/dates alphabetically).
+// Click a column header in any table.list to sort by it. Cells may carry data-sort (e.g. ISO dates).
 document.querySelectorAll("table.list").forEach((table) => {
   table.querySelectorAll("th").forEach((th, col) => {
     th.style.cursor = "pointer";
@@ -9,7 +9,9 @@ document.querySelectorAll("table.list").forEach((table) => {
       table.querySelectorAll("th").forEach((h) => { delete h.dataset.dir; h.classList.remove("asc", "desc"); });
       th.dataset.dir = dir; th.classList.add(dir);
       const key = (row) => {
-        const t = row.cells[col]?.innerText.trim() ?? "";
+        const cell = row.cells[col];
+        if (cell?.dataset.sort !== undefined) return cell.dataset.sort;  // e.g. ISO dates
+        const t = cell?.innerText.trim() ?? "";
         const n = parseFloat(t.replace(/[%,]/g, ""));
         return /^-?[\d.]+%?$/.test(t) ? n : t.toLowerCase();
       };

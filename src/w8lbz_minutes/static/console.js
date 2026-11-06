@@ -6,12 +6,12 @@
   const people = Object.fromEntries(D.members.map((m) => [m.id, m]));
   const STEPS = ["Attendance", "Bills and Communications", "Financial Report", "Community Reports",
     "Old Business", "New Business", "Winners", "Upcoming Chow", "Upcoming Events", "Review"];
+  const EMPTY_NOTE = "Leave it empty if there's nothing this week; empty sections are left out of the minutes.";
   const HINTS = {
     "Old Business": "Carried forward from last meeting (its Old and New Business). Delete what's finished, update the rest.",
     "Upcoming Events": "Carried forward from last meeting. Delete past events, add new ones.",
     "Winners": "e.g. “50/50 drawing – Jim F $7.50” and “Weekly drawing – Dave G, not registered (up to $62)”.",
-    "Upcoming Chow": "Leave empty to show “See the attached chow list”.",
-    "Financial Report": "Leave empty if there's no report this week; the section is then left out.",
+    "Upcoming Chow": "Leave it empty to show “See the attached chow list”.",
   };
   const panel = document.getElementById("panel");
   const saved = document.getElementById("saved");
@@ -207,7 +207,8 @@
     const rows = itemRows(arr, set);
     const motion = sec === "New Business" || sec === "Old Business" ? h("button", { class: "btn small ghost", onclick: () => {
       arr.push("Motion: ___ moved to ___, seconded by ___. Passed."); set(arr); render(); save(); } }, "+ Motion") : null;
-    return h("div", {}, h("h2", {}, sec), HINTS[sec] ? h("p", { class: "hint" }, HINTS[sec]) : null, rows, motion);
+    const hint = [HINTS[sec], sec === "Upcoming Chow" ? null : EMPTY_NOTE].filter(Boolean).join(" ");
+    return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, hint), rows, motion);
   }
 
   // ---------- review & submit ----------

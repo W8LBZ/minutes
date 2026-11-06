@@ -4,7 +4,7 @@
 <table class="list"><thead><tr><th>Guest</th><th>Callsign</th><th class="n">Visits</th><th>First visit</th><th>Last visit</th><th>Status</th></tr></thead>
 <tbody>{% for g in guests %}<tr>
 <td>{{ g.name }}</td><td class="cs">{{ g.callsign or '' }}</td><td class="n">{{ g.visits|length }}</td>
-<td><a href="/meetings/{{ g.visits[0][0] }}">{{ g.visits[0][0] }}</a></td><td><a href="/meetings/{{ g.visits[-1][0] }}">{{ g.visits[-1][0] }}</a></td>
-<td>{% if g.member %}<a href="/members/{{ g.member }}">member</a>{% if g.joined %} since {{ g.joined }}{% endif %}{% elif g.visits|length >= 3 %}<span class="badge warn">regular, invite to join?</span>{% endif %}</td>
+<td data-sort="{{ g.visits[0][0] }}"><a href="/meetings/{{ g.visits[0][0] }}">{{ g.visits[0][0]|listdate }}</a></td><td data-sort="{{ g.visits[-1][0] }}"><a href="/meetings/{{ g.visits[-1][0] }}">{{ g.visits[-1][0]|listdate }}</a></td>
+<td>{% if g.member %}<a href="/members/{{ g.member }}">member</a>{% if g.joined %} since {{ g.joined|listdate }}{% endif %}{% elif g.visits|length >= 3 %}<span class="badge warn">regular, invite to join?</span>{% endif %}</td>
 </tr>{% endfor %}</tbody></table>
 {% endblock %}
