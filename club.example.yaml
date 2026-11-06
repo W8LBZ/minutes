@@ -20,11 +20,14 @@ email:
   # Everything else is withheld and logged. Remove only_to to email members for real.
   only_to: [KD8XYZ]
 
-links:  # shown in the "Club Links" footer of the minutes
+links:  # shown in the "Club Links" footer of the minutes and on the Links page
+  # Optional icon: video, chat, globe, document, radio, calendar or link (guessed from the address if left out)
   - label: Teams meeting
     url: https://teams.live.com/meet/REPLACE_ME
   - label: Club Discord
     url: https://discord.com/invite/REPLACE_ME
+  - label: Constitution and Bylaws   # the app's /bylaws page; use the full address so it works in the PDF
+    url: https://minutes.example-tailnet.ts.net/bylaws
 
 roster:  # the club roster Google Sheet (share it with the service account as Viewer)
   sheet_id: REPLACE_ME

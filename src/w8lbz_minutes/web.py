@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,6 +16,7 @@ from markupsafe import Markup, escape
 
 from . import console
 from .auth import Auth, _safe_next
+from .club import DATA
 from .meeting import SECTIONS
 from .store import Archive
 
@@ -215,16 +216,50 @@ async def passkey_login_verify(request: Request):
 
 # ---------------- archive ----------------
 
+PER_PAGE = 26  # meetings per archive page: about half a year
+
+
+def years() -> list[int]:
+    return sorted({m.date.year for m in archive.meetings}, reverse=True)
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    return page(request, "index.html", meetings=archive.meetings)
+def index(request: Request, year: str = "", p: str = Query("1", alias="page")):
+    """Meetings grouped by year, newest first. With ?year=, that year alone, PER_PAGE at a time."""
+    # The "All years" option sends year= (empty); anything that isn't a number means all years.
+    year = int(year) if year.isdigit() else None
+    p = int(p) if p.isdigit() else 1
+    if year:
+        ms = [m for m in archive.meetings if m.date.year == year]
+        pages = max(1, -(-len(ms) // PER_PAGE))
+        p = min(max(p, 1), pages)
+        groups = [(year, ms[(p - 1) * PER_PAGE:p * PER_PAGE], len(ms))]
+    else:
+        pages = 1
+        groups = [(y, ms[:PER_PAGE], len(ms))
+                  for y in years() for ms in [[m for m in archive.meetings if m.date.year == y]]]
+    this_year = dt.date.today().year
+    open_year = year or (this_year if this_year in years() else next(iter(years()), None))
+    return page(request, "index.html", groups=groups, years=years(), year=year, open_year=open_year,
+                p=p, pages=pages)
 
 
 @app.get("/meetings/{slug}", response_class=HTMLResponse)
 def view(request: Request, slug: str):
     m = get_meeting(slug)
     has_original = (archive.root / slug / "original.pdf").exists()
-    return page(request, "meeting.html", m=m, has_original=has_original)
+    return page(request, "meeting.html", m=m, has_original=has_original,
+                emailed=console.email_status(archive, slug))
+
+
+def render_pdf(m) -> tuple[str, bytes]:
+    """(file name, PDF bytes) for submitted minutes."""
+    try:
+        from weasyprint import HTML
+    except OSError as e:  # missing system libraries (pango)
+        raise HTTPException(503, f"PDF rendering unavailable on this server: {e}")
+    html = templates.get_template("minutes_doc.html").render(m=m, pdf=True)
+    return f"{m.date.day}-{m.date:%b}-{m.date:%y}-minutes.pdf".lower(), HTML(string=html, base_url=str(HERE)).write_pdf()
 
 
 @app.get("/meetings/{slug}/minutes.pdf")
@@ -232,13 +267,7 @@ def pdf(request: Request, slug: str):
     m = get_meeting(slug)
     if m.status == "draft":
         raise HTTPException(409, "This meeting is still in progress; the PDF is available once the minutes are submitted.")
-    try:
-        from weasyprint import HTML
-    except OSError as e:  # missing system libraries (pango)
-        raise HTTPException(503, f"PDF rendering unavailable on this server: {e}")
-    html = templates.get_template("minutes_doc.html").render(m=m, pdf=True)
-    data = HTML(string=html, base_url=str(HERE)).write_pdf()
-    fname = f"{m.date.day}-{m.date:%b}-{m.date:%y}-minutes.pdf".lower()
+    fname, data = render_pdf(m)
     return Response(data, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
@@ -267,9 +296,67 @@ def member(request: Request, mid: str):
                 total=len(archive.meetings))
 
 
+@app.get("/roster", response_class=HTMLResponse)
+def roster(request: Request):
+    """Members' public-to-members details only: no phone, address or email."""
+    def since(m):
+        try:
+            return dt.date.fromisoformat(m.member_since) if m.member_since else None
+        except ValueError:
+            return None
+    gone = ("inactive", "silent key")
+    ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
+    return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
+                active=sum(m.status.lower() not in gone for m in ms))
+
+
+@app.get("/bylaws", response_class=HTMLResponse)
+def bylaws(request: Request):
+    """The club's constitution and bylaws, from bylaws.md in the data directory (not in this public repo)."""
+    import markdown
+    p = DATA / "bylaws.md"
+    html = Markup(markdown.markdown(p.read_text())) if p.exists() else None
+    return page(request, "bylaws.html", html=html)
+
+
+LINK_ICONS = (("teams.", "video"), ("zoom.", "video"), ("meet.", "video"), ("discord.", "chat"),
+              ("/bylaws", "document"), ("docs.google.", "document"), (".pdf", "document"), ("calendar", "calendar"))
+
+
+def link_icon(url: str) -> str:
+    """Icon name for a club link, guessed from its address. In club.yaml a link can set `icon:` to one of
+    video, chat, globe, document, radio, calendar or link."""
+    u = url.lower()
+    return next((icon for key, icon in LINK_ICONS if key in u), "globe" if u.count("/") <= 3 else "link")
+
+
+templates.env.filters["link_icon"] = link_icon
+
+
+def link_host(url: str) -> str:
+    host = re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
+    return "on this site" if host == authn.rp_id else host
+
+
+templates.env.filters["link_host"] = link_host
+
+
+@app.get("/links", response_class=HTMLResponse)
+def links(request: Request):
+    return page(request, "links.html")
+
+
 @app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request):
-    return page(request, "stats.html", s=archive.stats())
+def stats(request: Request, period: str = "12m"):
+    """Attendance for the last 12 months (default), all time, or one year."""
+    if period == "all":
+        ms, label = archive.meetings, "on record"
+    elif period.isdigit():
+        ms, label = [m for m in archive.meetings if m.date.year == int(period)], f"in {period}"
+    else:
+        period, cutoff = "12m", dt.date.today() - dt.timedelta(days=365)
+        ms, label = [m for m in archive.meetings if m.date > cutoff], "in the last 12 months"
+    return page(request, "stats.html", s=archive.stats(ms), period=period, label=label, years=years())
 
 
 @app.get("/guests", response_class=HTMLResponse)
@@ -319,10 +406,15 @@ async def console_save(request: Request, slug: str, mid: str = Depends(leader)):
     return {"ok": True}
 
 
+def email_minutes(slug: str, url: str) -> None:
+    console.email_minutes(archive, slug, lambda: render_pdf(archive.by_slug[slug]), url)
+
+
 @app.post("/console/{slug}/submit")
-def console_submit(slug: str, mid: str = Depends(leader)):
+def console_submit(request: Request, background: BackgroundTasks, slug: str, mid: str = Depends(leader)):
     get_meeting(slug)
     console.submit(archive, slug)
+    background.add_task(email_minutes, slug, f"{base_url(request)}/meetings/{slug}")
     return RedirectResponse(f"/meetings/{slug}", status_code=303)
 
 

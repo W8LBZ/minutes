@@ -70,3 +70,63 @@ def test_discard_only_drafts(tmp_path):
         raise AssertionError("published minutes must not be discarded")
     except ValueError:
         pass
+
+
+class FakeSMTP:
+    """Stands in for smtplib.SMTP: records messages instead of sending them."""
+    outbox: list = []
+
+    def __init__(self, host, port, timeout=None): pass
+    def __enter__(self): return self
+    def __exit__(self, *a): pass
+    def starttls(self): pass
+    def login(self, user, password): pass
+    def send_message(self, msg): FakeSMTP.outbox.append(msg)
+
+
+def mail_archive(tmp_path, monkeypatch, only_to):
+    from w8lbz_minutes import auth
+    monkeypatch.setattr(auth.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setenv("W8LBZ_SMTP_USER", "club@example.org")
+    monkeypatch.setenv("W8LBZ_SMTP_PASSWORD", "abcd efgh")
+    FakeSMTP.outbox = []
+    c = Club(Path(__file__).parent / "fixtures" / "test-club.yaml", roster=[
+        {"id": "doe", "first": "Jane", "last": "Doe", "email": "jane@example.org", "minutes_editor": True},
+        {"id": "kim", "first": "Sam", "last": "Kim", "email": "sam@example.org"},
+        {"id": "roe", "first": "Rick", "last": "Roe", "email": "rick@example.org", "status": "Silent Key"},
+        {"id": "dunn", "first": "Jane", "last": "Dunn"}])
+    c.email = {"only_to": only_to} if only_to is not None else {}
+    Meeting(date=dt.date(2026, 11, 12), status="published", leader="doe").save(tmp_path)
+    return Archive(tmp_path, c)
+
+
+def test_email_minutes_test_mode_only_reaches_allowlist(tmp_path, monkeypatch):
+    a = mail_archive(tmp_path, monkeypatch, only_to=["doe"])
+    st = console.email_minutes(a, "2026-11-12", lambda: ("m.pdf", b"%PDF"), "http://x/meetings/2026-11-12")
+    assert [m["To"] for m in FakeSMTP.outbox] == ["jane@example.org"]  # Sam is on the roster but withheld
+    assert st["sent"] == 1 and st["roster"] == 2 and st["test_mode"]
+    msg = FakeSMTP.outbox[0]
+    assert msg["Reply-To"] == "jane@example.org" and "November 12, 2026" in msg["Subject"]
+    assert [p.get_filename() for p in msg.iter_attachments()] == ["m.pdf"]
+    console.email_minutes(a, "2026-11-12", lambda: ("m.pdf", b"%PDF"), "u")  # only once
+    assert len(FakeSMTP.outbox) == 1
+
+
+def test_email_minutes_empty_allowlist_sends_nothing(tmp_path, monkeypatch):
+    a = mail_archive(tmp_path, monkeypatch, only_to=[])
+    assert console.email_minutes(a, "2026-11-12", lambda: ("m.pdf", b"%PDF"), "u")["sent"] == 0
+    assert FakeSMTP.outbox == []
+
+
+def test_email_minutes_live_skips_inactive_and_addressless(tmp_path, monkeypatch):
+    a = mail_archive(tmp_path, monkeypatch, only_to=None)
+    console.email_minutes(a, "2026-11-12", lambda: ("m.pdf", b"%PDF"), "u")
+    assert sorted(m["To"] for m in FakeSMTP.outbox) == ["jane@example.org", "sam@example.org"]
+
+
+def test_email_minutes_records_failure_and_retries(tmp_path, monkeypatch):
+    a = mail_archive(tmp_path, monkeypatch, only_to=["doe"])
+    def broken(): raise OSError("no pango")
+    assert "no pango" in console.email_minutes(a, "2026-11-12", broken, "u")["error"]
+    assert console.email_status(a, "2026-11-12")["error"]
+    assert console.email_minutes(a, "2026-11-12", lambda: ("m.pdf", b"%PDF"), "u")["sent"] == 1

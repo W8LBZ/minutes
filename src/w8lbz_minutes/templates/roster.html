@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}Roster{% endblock %}{% block body %}
+<h1>Roster</h1>
+<p class="muted">{{ active }} active members. From the club roster sheet, synced daily.</p>
+<table class="list"><thead><tr><th>Name</th><th>Callsign</th><th>License</th><th>Office</th><th>Status</th><th>Member since</th></tr></thead>
+<tbody>{% for m, since in rows %}<tr>
+<td data-sort="{{ m.last|lower }} {{ m.first|lower }}"><a href="/members/{{ m.id }}">{{ m.name }}</a></td><td class="cs">{{ m.callsign or '' }}</td>
+<td>{{ m.license_class or '' }}</td><td>{{ m.role or '' }}</td>
+<td>{% if m.status != 'Active' %}<span class="badge">{{ m.status }}</span>{% else %}Active{% endif %}</td>
+<td data-sort="{{ since or '' }}">{{ since|listdate if since }}</td>
+</tr>{% endfor %}</tbody></table>
+{% endblock %}

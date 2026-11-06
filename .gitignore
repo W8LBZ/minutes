@@ -9,3 +9,5 @@ private/
 club.yaml
 *.json
 .env
+*.docx
+bylaws.md

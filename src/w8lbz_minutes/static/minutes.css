@@ -17,3 +17,6 @@
 .muted { color: #667; }
 body.pdf { margin: 0; } @page { size: letter; margin: .7in; }
 body.pdf .minutes h2 { break-after: avoid; }
+.bylaws h1, .bylaws h2, .bylaws h2 + p { text-align: center; }
+.bylaws h2 { background: none; font-size: 1.3rem; margin-top: 0; }
+.bylaws h3 { background: #c3d69b; font-size: 1rem; margin: 1.4rem 0 .5rem; padding: .15rem .4rem; }  /* like a minutes section */

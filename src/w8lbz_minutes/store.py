@@ -1,6 +1,7 @@
 """Archive access: loads meetings from disk; full-text search, stats, guest tracking."""
 from __future__ import annotations
 
+import datetime as dt
 import re
 import sqlite3
 from collections import defaultdict
@@ -61,12 +62,14 @@ class Archive:
         reports = [(m, it) for m in self.meetings for it in m.items("Community Reports") if it.member == mid]
         return {"present": present, "reports": reports}
 
-    def stats(self) -> dict:
+    def stats(self, meetings: list[Meeting] | None = None) -> dict:
+        """Attendance totals over `meetings` (default: all), newest first."""
+        meetings = self.meetings if meetings is None else meetings
         rows = [{"meeting": m, "in_person": len(m.in_person), "remote": len(m.remote),
                  "guests": len(m.guests) + m.visitors, "total": m.attendance + len(m.guests) + m.visitors}
-                for m in self.meetings]
+                for m in meetings]
         per_member = defaultdict(lambda: {"in_person": 0, "remote": 0, "last": None})
-        for m in self.meetings:
+        for m in meetings:
             for mid in m.in_person:
                 per_member[mid]["in_person"] += 1
             for mid in m.remote:
@@ -74,13 +77,13 @@ class Archive:
             for mid in m.in_person + m.remote:
                 if per_member[mid]["last"] is None:
                     per_member[mid]["last"] = m.date  # meetings are newest first
-        n = len(self.meetings) or 1
+        n = len(meetings) or 1
         members = sorted(
             ({"id": k, "name": self.club.name(k), **v, "total": v["in_person"] + v["remote"],
               "rate": (v["in_person"] + v["remote"]) / n} for k, v in per_member.items()),
             key=lambda r: -r["total"])
         avg = sum(r["total"] for r in rows) / n
-        return {"rows": rows, "members": members, "avg": avg, "count": len(self.meetings)}
+        return {"rows": rows, "members": members, "avg": avg, "count": len(meetings)}
 
     def guests(self) -> list[dict]:
         """Group guest visits by callsign, else by normalized name. Flag guests who later became members."""
@@ -96,10 +99,14 @@ class Archive:
                 grp["visits"].append((m.date, g.get("notes", "")))
         for grp in groups.values():
             grp["member"] = self._member_for_guest(grp)
-            if grp["member"]:
-                first_member = min((m.date for m in self.meetings
-                                    if grp["member"] in m.in_person + m.remote), default=None)
-                grp["joined"] = first_member
+            if grp["member"]:  # the roster's member-since date, else their first meeting as a member
+                since = self.club.members[grp["member"]].member_since
+                try:
+                    grp["joined"] = dt.date.fromisoformat(since) if since else None
+                except ValueError:
+                    grp["joined"] = None
+                grp["joined"] = grp["joined"] or min((m.date for m in self.meetings
+                                                      if grp["member"] in m.in_person + m.remote), default=None)
         return sorted(groups.values(), key=lambda g: (-len(g["visits"]), g["name"]))
 
     def _member_for_guest(self, grp: dict) -> str | None:

@@ -5,6 +5,7 @@ import pytest
 from w8lbz_minutes.club import Club
 from w8lbz_minutes.importer import file_date, parse
 from w8lbz_minutes.meeting import Meeting
+from w8lbz_minutes.store import Archive
 
 FIX = Path(__file__).parent / "fixtures"
 club = Club(FIX / "test-club.yaml")
@@ -67,3 +68,101 @@ def test_membership_log():
                     {"callsign": "", "full_name": "Old Timer", "date": "", "event": "Silent Key"}])
     assert ms[0]["officer"] and ms[0]["member_since"] == "2026-01-21"
     assert ms[1]["id"] == "old-timer" and ms[1]["events"][0]["event"] == "Silent Key"
+
+
+def test_roster_page_shows_no_contact_details(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    c = Club(FIX / "test-club.yaml", roster=[
+        {"id": "kd8aaa", "first": "Jane", "last": "Doe", "callsign": "KD8AAA", "email": "jane@example.org",
+         "license_class": "Extra", "role": "Secretary", "officer": True, "member_since": "2024-03-07"},
+        {"id": "kd8bbb", "first": "Old", "last": "Timer", "status": "Silent Key", "member_since": "not a date"}])
+    monkeypatch.setattr(web, "archive", Archive(tmp_path, c))
+    monkeypatch.setattr(web.templates.env, "globals", {**web.templates.env.globals, "club": c})
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "kd8aaa")
+    html = TestClient(web.app).get("/roster").text
+    assert "KD8AAA" in html and "Secretary" in html and "Mar 7, 2024" in html and "Silent Key" in html
+    assert "jane@example.org" not in html
+    assert html.index("Doe") < html.index("Timer")
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    """A signed-in test client over a throwaway archive of weekly meetings, 30 in 2024 and 3 in 2025."""
+    import datetime as dt
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    for i in range(30):
+        Meeting(date=dt.date(2024, 1, 4) + dt.timedelta(weeks=i), status="published", in_person=["doe"]).save(tmp_path)
+    for d in (dt.date(2025, 1, 2), dt.date(2025, 1, 9), dt.date.today()):
+        Meeting(date=d, status="published", in_person=["doe", "kim"]).save(tmp_path)
+    monkeypatch.setattr(web, "archive", Archive(tmp_path, club))
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    return TestClient(web.app)
+
+
+def rows(html):
+    return html.count('<tr><td data-sort=')
+
+
+def test_archive_groups_by_year_and_pages(client):
+    html = client.get("/").text
+    assert "All 30 meetings from 2024" in html  # 2024 is cut at a page and links to its own view
+    assert rows(html) == 26 + 2 + 1  # 2024 cut to one page, 2025, and this year
+    assert html.count("<details") == 3 and html.count("<details class=\"year\" open") == 1
+    p1, p2 = client.get("/?year=2024").text, client.get("/?year=2024&page=2").text
+    assert rows(p1) == 26 and rows(p2) == 4 and "Page 2 of 2" in p2
+    assert rows(client.get("/?year=2024&page=99").text) == 4  # clamped to the last page
+    for junk in ("/?year=", "/?year=abc", "/?year=2024&page=x"):  # "All years" sends year= (empty)
+        r = client.get(junk)
+        assert r.status_code == 200 and "<details" in r.text
+
+
+def test_stats_periods(client):
+    assert "33 meetings on record" in client.get("/stats?period=all").text
+    assert "30 meetings in 2024" in client.get("/stats?period=2024").text
+    assert "1 meeting in the last 12 months" in client.get("/stats").text
+
+def test_guests_page_moves_new_members_to_their_own_section(tmp_path, monkeypatch):
+    import datetime as dt
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    from w8lbz_minutes.store import Archive
+    for d in (dt.date(2026, 10, 1), dt.date(2026, 10, 8)):
+        Meeting(date=d, status="published", guests=[{"name": "Rick Roe"}, {"name": "Pat Guest"}]).save(tmp_path)
+    Meeting(date=dt.date(2026, 10, 15), status="published", in_person=["roe"]).save(tmp_path)
+    monkeypatch.setattr(web, "archive", Archive(tmp_path, club))
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    html = TestClient(web.app).get("/guests").text
+    current, joined = html.split("<h2>Became members")
+    assert "Pat Guest" in current and "Rick Roe" not in current
+    assert "Rick Roe" in joined and "Oct 15, 2026" in joined and "after 2.0 visits" in joined
+
+
+def test_bylaws_page(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    monkeypatch.setattr(web, "DATA", tmp_path)
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    c = TestClient(web.app)
+    assert "haven't been added yet" in c.get("/bylaws").text
+    (tmp_path / "bylaws.md").write_text("# Constitution\n\n### Article I\n\n**A.** Meetings <b>weekly</b>.")
+    html = c.get("/bylaws").text
+    assert "<h1>Constitution</h1>" in html and "<strong>A.</strong>" in html
+
+
+def test_links_page_lists_club_links(monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    monkeypatch.setattr(web.archive.club, "links", [{"label": "Club Discord", "url": "https://discord.example/x"}])
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "doe")
+    html = TestClient(web.app).get("/links").text
+    assert 'href="https://discord.example/x"' in html and "Club Discord" in html and 'href="/links"' in html
+
+
+def test_link_icons():
+    from w8lbz_minutes.web import link_icon
+    assert link_icon("https://teams.live.com/meet/1?p=x") == "video"
+    assert link_icon("https://discord.com/invite/abc") == "chat"
+    assert link_icon("https://minutes.example.ts.net/bylaws") == "document"
+    assert link_icon("https://w8lbz.org") == "globe"
+    assert link_icon("https://example.org/some/page") == "link"
