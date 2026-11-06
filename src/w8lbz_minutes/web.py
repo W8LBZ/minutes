@@ -319,6 +319,11 @@ def bylaws(request: Request):
     return page(request, "bylaws.html", html=html)
 
 
+@app.get("/links", response_class=HTMLResponse)
+def links(request: Request):
+    return page(request, "links.html")
+
+
 @app.get("/stats", response_class=HTMLResponse)
 def stats(request: Request, period: str = "12m"):
     """Attendance for the last 12 months (default), all time, or one year."""

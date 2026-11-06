@@ -39,3 +39,5 @@ button.btn { border: 0; cursor: pointer; font: inherit; } .btn.small { padding: 
 details.year { margin: .5rem 0 1rem; } details.year > summary { cursor: pointer; font-size: 1.2rem; font-weight: 600; padding: .3rem 0; }
 details.year > summary .muted { font-size: .9rem; font-weight: normal; }
 .pager { display: flex; gap: .75rem; align-items: center; }
+.linklist { list-style: none; padding: 0; } .linklist li { padding: .45rem 0; border-bottom: 1px solid #e3e3dc; }
+.linklist a { font-weight: 600; margin-right: .5rem; } .linklist .muted { font-size: .85rem; word-break: break-all; }
