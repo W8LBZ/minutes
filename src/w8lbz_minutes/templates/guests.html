@@ -1,10 +1,23 @@
 {% extends "base.html" %}{% block body %}
+{% set current = guests|rejectattr('member')|list %}{% set joined = guests|selectattr('member')|list %}
 <h1>Guests</h1>
-<p class="muted">Visits are grouped by callsign, or by name if there's no callsign. Guests who later appear on the attendance list are marked as members.</p>
-<table class="list"><thead><tr><th>Guest</th><th>Callsign</th><th class="n">Visits</th><th>First visit</th><th>Last visit</th><th>Status</th></tr></thead>
-<tbody>{% for g in guests %}<tr>
+<p class="muted">Visits are grouped by callsign, or by name if there's no callsign. Guests who later join move to "Became members" below.</p>
+<table class="list"><thead><tr><th>Guest</th><th>Callsign</th><th class="n">Visits</th><th>First visit</th><th>Last visit</th><th></th></tr></thead>
+<tbody>{% for g in current %}<tr>
 <td>{{ g.name }}</td><td class="cs">{{ g.callsign or '' }}</td><td class="n">{{ g.visits|length }}</td>
 <td data-sort="{{ g.visits[0][0] }}"><a href="/meetings/{{ g.visits[0][0] }}">{{ g.visits[0][0]|listdate }}</a></td><td data-sort="{{ g.visits[-1][0] }}"><a href="/meetings/{{ g.visits[-1][0] }}">{{ g.visits[-1][0]|listdate }}</a></td>
-<td>{% if g.member %}<a href="/members/{{ g.member }}">member</a>{% if g.joined %} since {{ g.joined|listdate }}{% endif %}{% elif g.visits|length >= (club.info.invite_after_visits or 3) %}<span class="badge warn">regular, invite to join?</span>{% endif %}</td>
+<td>{% if g.visits|length >= (club.info.invite_after_visits or 3) %}<span class="badge warn">regular, invite to join?</span>{% endif %}</td>
+</tr>{% else %}<tr><td colspan="6" class="muted">No guests yet.</td></tr>{% endfor %}</tbody></table>
+
+{% if joined %}
+<h2>Became members</h2>
+<p class="muted">{{ joined|length }} guest{{ 's' if joined|length != 1 }} joined{% set n = joined|map(attribute='visits')|map('length')|list %}, after {{ '%.1f'|format(n|sum / n|length) }} visits on average.</p>
+<table class="list"><thead><tr><th>Member</th><th>Callsign</th><th class="n">Visits as a guest</th><th>First visit</th><th>Joined</th></tr></thead>
+<tbody>{% for g in joined %}<tr>
+<td><a href="/members/{{ g.member }}">{{ club.name(g.member) }}</a></td><td class="cs">{{ club.members[g.member].callsign or g.callsign or '' }}</td>
+<td class="n">{{ g.visits|length }}</td>
+<td data-sort="{{ g.visits[0][0] }}"><a href="/meetings/{{ g.visits[0][0] }}">{{ g.visits[0][0]|listdate }}</a></td>
+<td data-sort="{{ g.joined or '' }}">{{ g.joined|listdate if g.joined }}</td>
 </tr>{% endfor %}</tbody></table>
+{% endif %}
 {% endblock %}
