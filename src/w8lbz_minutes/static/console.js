@@ -253,7 +253,8 @@
       invites.length ? h("div", { class: "invitebox" }, `Before closing: invite ${invites.map((g) => `${g.name} (${ordinal(visitNo(g))} visit)`).join(", ")} to apply for membership.`) : null,
       missing.length ? h("p", { class: "hint" }, `No report recorded for: ${missing.map(label).join(", ")}.`) : null,
       h("p", {}, h("button", { class: "btn warn", onclick: async () => {
-        if (!confirm("Submit these minutes? They will be published to the archive.")) return;
+        const E = D.email, who = E.only_to ? `TEST MODE: only to ${E.only_to.join(", ")}` : `all ${E.roster} members on the roster`;
+        if (!confirm(`Submit these minutes? They will be published to the archive and emailed (${who}).`)) return;
         await save(true); document.getElementById("submitform").submit();
       } }, "Submit minutes")),
       box);

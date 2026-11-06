@@ -90,9 +90,9 @@ def test_email_test_mode_withholds_other_recipients(monkeypatch):
     monkeypatch.setenv("W8LBZ_SMTP_USER", "club@example.org")
     monkeypatch.setenv("W8LBZ_SMTP_PASSWORD", "abcd efgh ijkl mnop")
     allow = {"me@example.org"}
-    assert auth_mod.send_email("someone@example.org", "s", "b", only_to=allow) is False
+    assert auth_mod.send_email("someone@example.org", "s", "b", only_to=allow) == 0
     assert calls == []
-    assert auth_mod.send_email("Me@Example.org", "s", "b", only_to=allow) is True
+    assert auth_mod.send_email("Me@Example.org", "s", "b", only_to=allow) == 1
     assert calls == [("login", "abcdefghijklmnop"), ("send", "Me@Example.org")]
 
 

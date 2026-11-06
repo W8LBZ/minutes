@@ -8,11 +8,15 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+import logging
 import shutil
+import time
 
+from . import auth
 from .meeting import SECTIONS, Item, Meeting
 from .store import Archive
 
+log = logging.getLogger("w8lbz.console")
 CARRY_FORWARD = ("Old Business", "Upcoming Events")  # copied from the previous meeting as a starting point
 
 
@@ -85,6 +89,7 @@ def context(archive: Archive, m: Meeting) -> dict:
         "past_guests": sorted(past, key=lambda g: (g["last"], g["visits"]), reverse=True),
         "sections": SECTIONS,
         "invite_after": int(club.info.get("invite_after_visits", 3)),
+        "email": {"roster": len(recipients(archive)), "only_to": club.email.get("only_to")},
     }
 
 
@@ -125,3 +130,43 @@ def discard(archive: Archive, slug: str) -> None:
         raise ValueError("Only drafts can be discarded")
     shutil.rmtree(archive.root / slug)
     archive.reload()
+
+
+def recipients(archive: Archive) -> list[str]:
+    """Roster addresses that get the minutes: everyone with an email who isn't Inactive or a Silent Key."""
+    return sorted({m.email.strip() for m in archive.club.members.values()
+                   if m.email and m.status.lower() not in ("inactive", "silent key")}, key=str.lower)
+
+
+def email_status(archive: Archive, slug: str) -> dict | None:
+    p = archive.root / slug / "emailed.json"
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def email_minutes(archive: Archive, slug: str, make_pdf, url: str) -> dict:
+    """Email submitted minutes (PDF from make_pdf() attached) to the roster, once.
+
+    Test mode (email.only_to) applies. The outcome, or the error, is kept in emailed.json.
+    """
+    if (done := email_status(archive, slug)) and not done.get("error"):
+        return done
+    m = archive.by_slug[slug]
+    club = archive.club
+    to = recipients(archive)
+    leader = club.members.get(m.leader or "")
+    date = m.date.strftime("%B %-d, %Y")
+    body = (f"Here are the minutes of the {club.info.get('callsign', '')} meeting of {date}"
+            f"{f', led by {leader.name}' if leader else ''}. The PDF is attached.\n\n"
+            f"Read them online, along with past minutes: {url}\n\n"
+            f"Replies go to {leader.first if leader and leader.email else 'the club'}.\n\n73,\n{club.info.get('callsign', '')}")
+    try:
+        pdf = make_pdf()
+        sent = auth.send_email(to, f"{club.info.get('callsign', '')} meeting minutes, {date}", body,
+                               attachments=[(pdf[0], pdf[1], "application/pdf")], only_to=club.email_only_to(),
+                               reply_to=leader.email if leader and leader.email else None)
+        status = {"at": int(time.time()), "sent": sent, "roster": len(to), "test_mode": club.email_only_to() is not None}
+    except Exception as e:
+        log.exception("emailing the minutes of %s failed", slug)
+        status = {"at": int(time.time()), "error": str(e)}
+    (archive.root / slug / "emailed.json").write_text(json.dumps(status))
+    return status

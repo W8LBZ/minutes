@@ -5,7 +5,7 @@
 <body>
 <nav class="top">
   <a class="brand" href="/"><img src="/static/logo.png" alt="">W8LBZ Minutes</a>
-  {% if me %}<a href="/">Archive</a><a href="/stats">Stats</a><a href="/guests">Guests</a>{% if can_lead %}<a href="/console">Lead a meeting</a>{% endif %}
+  {% if me %}<a href="/">Archive</a><a href="/roster">Roster</a><a href="/stats">Stats</a><a href="/guests">Guests</a><a href="/links">Links</a>{% if can_lead %}<a href="/console">Lead a meeting</a>{% endif %}
   <form action="/search"><input name="q" type="search" placeholder="Search all minutes…" value="{{ q or '' }}"></form>
   <a class="me" href="/account" title="Your account">{{ me.short or me.first }}</a>{% endif %}
 </nav>
