@@ -1,9 +1,15 @@
-"""Club config and roster (club.yaml for now; Google Sheet sync later)."""
+"""Club config and people.
+
+People come from the roster Google Sheet (synced to data/roster.json by `w8lbz-minutes roster`).
+club.yaml (local only, never in git) holds app settings plus temporary per-member
+`overrides` for things the sheet has no column for yet (short_name, aliases, minutes_role).
+"""
 from __future__ import annotations
 
+import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from functools import cached_property
 from pathlib import Path
 
@@ -12,6 +18,7 @@ import yaml
 ROOT = Path(os.environ.get("W8LBZ_ROOT", Path(__file__).resolve().parents[2]))
 DATA = Path(os.environ.get("W8LBZ_DATA", ROOT / "data"))
 MEETINGS = DATA / "meetings"
+ROSTER_CACHE = DATA / "roster.json"
 
 
 def _n(s: str) -> str:
@@ -25,7 +32,12 @@ class Member:
     last: str
     short: str | None = None
     callsign: str | None = None
-    role: str | None = None
+    email: str | None = None
+    role: str | None = None  # officer title(s)
+    officer: bool = False
+    board: bool = False
+    license_class: str | None = None
+    minutes_role: str | None = None  # leader | editor
     status: str = "active"
     aliases: list[str] = field(default_factory=list)
 
@@ -35,29 +47,60 @@ class Member:
 
 
 class Club:
-    """Local club config (club.yaml, never in git). Roster entries here are a stopgap until the
-    Google Sheet sync (FR-35a); the sheet will be the only source of truth for people."""
-
-    def __init__(self, path: Path = Path(os.environ.get("W8LBZ_CONFIG", ROOT / "club.yaml"))):
-        cfg = yaml.safe_load(path.read_text())
+    def __init__(self, path: Path | None = None, roster: list[dict] | None = None):
+        path = path or Path(os.environ.get("W8LBZ_CONFIG", ROOT / "club.yaml"))
+        cfg = yaml.safe_load(path.read_text()) or {}
         self.info = cfg.get("club", {})
         self.links = cfg.get("links", [])
-        self.leaders = cfg.get("leaders", [])
-        self.editors = cfg.get("editors", [])
         self.redact = [_n(x) for x in (cfg.get("privacy") or {}).get("never_record", [])]
-        self.members = {mid: Member(id=mid, **(v or {})) for mid, v in cfg.get("members", {}).items()}
 
+        if roster is None and "members" in cfg:  # inline members (tests, example config)
+            roster = [{"id": k, **(v or {})} for k, v in cfg["members"].items()]
+        if roster is None and ROSTER_CACHE.exists():
+            roster = json.loads(ROSTER_CACHE.read_text())
+        known = {f.name for f in fields(Member)}
+        self.members: dict[str, Member] = {}
+        for d in roster or []:
+            d = {**d, **((cfg.get("overrides") or {}).get(d["id"]) or {})}
+            self.members[d["id"]] = Member(**{k: v for k, v in d.items() if k in known})
+        self._auto_short_names()
+
+    def _auto_short_names(self) -> None:
+        """'Chris D' / 'Chris K' style names when a first name is shared."""
+        by_first: dict[str, list[Member]] = {}
+        for m in self.members.values():
+            by_first.setdefault(m.first.lower(), []).append(m)
+        for group in by_first.values():
+            for m in group:
+                if not m.short and len(group) > 1 and m.last:
+                    m.short = f"{m.first} {m.last[0]}"
+
+    # ---- permissions ----
+    def can_lead(self, mid: str) -> bool:
+        m = self.members.get(mid)
+        return bool(m and (m.officer or m.minutes_role == "leader"))
+
+    def can_edit(self, mid: str) -> bool:
+        m = self.members.get(mid)
+        return bool(m and (self.can_lead(mid) or m.minutes_role == "editor"))
+
+    @property
+    def leaders(self) -> list[str]:
+        return [mid for mid in self.members if self.can_lead(mid)]
+
+    # ---- privacy ----
     def is_redacted(self, text: str) -> bool:
         t = _n(text)
         return any(r and r in t for r in self.redact)
 
+    # ---- names ----
     def name(self, mid: str | None) -> str:
         m = self.members.get(mid or "")
-        return m.name if m else (mid or "")
+        return m.name if m else (mid or "").title()
 
     def short(self, mid: str) -> str:
         m = self.members.get(mid)
-        return (m.short or m.first or m.last) if m else mid
+        return (m.short or m.first or m.last) if m else mid.title()
 
     def resolve_surname(self, word: str) -> str | None:
         """Map an attendance-list surname (with spelling drift) to a member id."""
