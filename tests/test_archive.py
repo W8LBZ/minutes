@@ -57,3 +57,13 @@ def test_former_callsign_maps_to_member(tmp_path, m):
     a = Archive(tmp_path, club)
     assert a.meetings[0].in_person == ["doe", "kim"]
     assert club.members["kim"].aliases == []  # not treated as a name spelling
+
+
+def test_membership_log():
+    from w8lbz_minutes.roster import attach_log, to_members
+    ms = to_members([{"full_name": "Sam Kim", "callsign": "KD8NEW", "is_officer": "True"},
+                     {"full_name": "Old Timer", "status": "Silent Key"}])
+    attach_log(ms, [{"callsign": "KD8NEW", "date": "46043", "event": "Joined"},
+                    {"callsign": "", "full_name": "Old Timer", "date": "", "event": "Silent Key"}])
+    assert ms[0]["officer"] and ms[0]["member_since"] == "2026-01-21"
+    assert ms[1]["id"] == "old-timer" and ms[1]["events"][0]["event"] == "Silent Key"

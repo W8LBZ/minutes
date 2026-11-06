@@ -42,6 +42,8 @@ class Member:
     minutes_editor: bool = False  # may lead meetings and edit minutes (officers always may)
     status: str = "Active"
     aliases: list[str] = field(default_factory=list)
+    events: list[dict] = field(default_factory=list)  # from the Membership Log tab
+    member_since: str | None = None
 
     @property
     def name(self) -> str:

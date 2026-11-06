@@ -37,20 +37,21 @@ def _sheet() -> tuple[str, str]:
     return r["sheet_id"], r.get("tab", "Member Roster")
 
 
-def fetch_rows() -> list[dict[str, str]]:
+def fetch_rows(tab: str | None = None) -> list[dict[str, str]]:
     import google.auth.transport.requests as gr
     from google.oauth2 import service_account
 
     creds = service_account.Credentials.from_service_account_file(
         KEY_FILE, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
     r = gr.AuthorizedSession(creds).get(
-        "https://sheets.googleapis.com/v4/spreadsheets/{}/values/{}".format(*_sheet()))
+        "https://sheets.googleapis.com/v4/spreadsheets/{}/values/{}".format(_sheet()[0], tab or _sheet()[1]),
+        params={"valueRenderOption": "UNFORMATTED_VALUE", "dateTimeRenderOption": "SERIAL_NUMBER"})
     r.raise_for_status()
     values = r.json().get("values", [])
     if not values:
         return []
     header = [h.strip().lower() for h in values[0]]
-    return [dict(zip(header, row + [""] * (len(header) - len(row)))) for row in values[1:]]
+    return [dict(zip(header, [str(x) for x in row] + [""] * (len(header) - len(row)))) for row in values[1:]]
 
 
 def to_members(rows: list[dict[str, str]]) -> list[dict]:
@@ -79,8 +80,43 @@ def to_members(rows: list[dict[str, str]]) -> list[dict]:
     return out
 
 
+def _iso_date(v: str) -> str | None:
+    """Sheets date serial (days since 1899-12-30) or a typed date -> YYYY-MM-DD."""
+    import datetime as dt
+    v = v.strip()
+    if not v:
+        return None
+    try:
+        return (dt.date(1899, 12, 30) + dt.timedelta(days=int(float(v)))).isoformat()
+    except ValueError:
+        for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+            try:
+                return dt.datetime.strptime(v, fmt).date().isoformat()
+            except ValueError:
+                pass
+    return v
+
+
+def attach_log(members: list[dict], log: list[dict[str, str]]) -> None:
+    """Membership Log tab: one row per event (Joined, Left, Silent Key, Callsign Change, ...)."""
+    by_cs = {m["callsign"]: m for m in members if m["callsign"]}
+    by_name = {m["first"] + " " + m["last"]: m for m in members}
+    for e in log:
+        m = by_cs.get(e.get("callsign", "").strip().upper()) or by_name.get(e.get("full_name", "").strip())
+        if m and e.get("event"):
+            m.setdefault("events", []).append(
+                {"date": _iso_date(e.get("date", "")), "event": e["event"].strip(), "note": e.get("note", "").strip() or None})
+    for m in members:
+        joins = [e["date"] for e in m.get("events", []) if e["event"] in ("Joined", "Rejoined") and e["date"]]
+        m["member_since"] = max(joins) if joins else None
+
+
 def sync() -> list[dict]:
     members = to_members(fetch_rows())
+    try:
+        attach_log(members, fetch_rows("Membership Log"))
+    except Exception as e:  # the log is optional
+        print(f"Membership Log not read: {e}")
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     tmp = CACHE.with_suffix(".tmp")
     tmp.write_text(json.dumps(members, indent=1))
