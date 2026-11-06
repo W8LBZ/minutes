@@ -59,7 +59,7 @@
 <h2 id="rotation">Rotation</h2>
 <p class="hint">The same order every round; new members go at the bottom.</p>
 <ol class="rotation">{% for mid in s.order %}{% set c = s.constraints.get(mid) %}<li>
-  <span class="who">{{ club.name(mid) }}{% if mid == next_up %} <span class="badge">next</span>{% endif %}</span>
+  <span class="who"><span class="n">{{ loop.index }}.</span> {{ club.name(mid) }}{% if mid == next_up %} <span class="badge">next</span>{% endif %}</span>
   {% if c %}<span class="muted small">{% if c.not_weeks %}not {{ c.not_weeks|join(', ') }}{{ ' week' }} of the month{% endif %}{% for a, b in c.away %} · away {{ fmt(a) }}–{{ fmt(b) }}{% endfor %}{% if c.note %} · {{ c.note }}{% endif %}</span>{% endif %}
   <span class="ops">
     {% for op, label in (('up', '↑'), ('down', '↓')) %}<form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="{{ op }}"><button class="btn small ghost" title="Move {{ op }}">{{ label }}</button></form>{% endfor %}
