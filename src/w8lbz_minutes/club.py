@@ -56,6 +56,7 @@ class Club:
         cfg = yaml.safe_load(path.read_text()) or {}
         self.info = cfg.get("club", {})
         self.links = cfg.get("links", [])
+        self.auth = cfg.get("auth") or {}
         self.redact = [_n(x) for x in (cfg.get("privacy") or {}).get("never_record", [])]
 
         if roster is None and "members" in cfg:  # inline members (tests, example config)
