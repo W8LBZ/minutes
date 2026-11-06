@@ -1,7 +1,7 @@
-{% extends "base.html" %}{% block title %}Club links{% endblock %}{% block body %}
+{% extends "base.html" %}{% from "_icons.html" import icon %}{% block title %}Club links{% endblock %}{% block body %}
 <h1>Club links</h1>
-<ul class="linklist">{% for l in club.links %}
-<li><a href="{{ l.url }}">{{ l.label }}</a> <span class="muted">{{ l.url }}</span></li>
-{% else %}<li class="muted">No links yet. They're set in club.yaml under <code>links</code>.</li>{% endfor %}</ul>
+<div class="linkgrid">{% for l in club.links %}
+<a class="linkcard" href="{{ l.url }}">{{ icon(l.icon or l.url|link_icon) }}<span class="label">{{ l.label }}</span><span class="host">{{ l.url|link_host }}</span></a>
+{% else %}<p class="muted">No links yet. They're set in club.yaml under <code>links</code>.</p>{% endfor %}</div>
 <p class="muted">These also appear in the "Club Links" footer of every set of minutes.</p>
 {% endblock %}
