@@ -155,3 +155,4 @@ ol.rotlist > li.next { background: #eaf2dc; box-shadow: inset 4px 0 0 #5b7a2f; }
 .rot-panel { grid-column: 1 / -1; margin-top: .3rem; }
 .rot-panel .weeks { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; margin: .2rem 0 .4rem; font-size: .92rem; }
 .rot-panel label.wk { display: inline-flex; gap: .25rem; align-items: center; font-weight: normal; flex-direction: row; margin: 0; }
+.rot-panel > form.inline { display: block; margin-top: .7rem; }

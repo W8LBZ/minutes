@@ -621,6 +621,8 @@ def admin_confirm_email(request: Request, next: str = Form("/"), mid: str = Depe
     if not m.email:
         raise HTTPException(400, "There's no email address for you on the roster.")
     url = f"{base_url(request)}/admin/confirm/link?t={authn.step_up_link(mid)}&next={quote(_safe_next(next))}"
+    if PREVIEW:  # no email leaves a preview, and its email log is behind admin mode: go straight through
+        return RedirectResponse(url, status_code=303)
     # Only ever to the admin themself, so test mode (email.only_to) doesn't apply.
     authmod.send_email(m.email, "Turn on admin mode", f"Hi {m.first},\n\nSomeone signed in as you asked to turn on admin mode "
                f"in W8LBZ Minutes. If that was you, open this link in the same browser within 5 minutes:\n\n{url}\n\n"
