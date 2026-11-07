@@ -35,7 +35,7 @@
         <select name="member"><option value="">(open)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == x.member }}>{{ m.name }}</option>{% endfor %}</select>
         <button class="btn small">Assign</button></form>
       <form method="post" action="/chow/none" class="inline"><input type="hidden" name="date" value="{{ d }}">
-        <input name="note" placeholder="Why (e.g. holiday)" value="{{ x.note if x.status == 'none' else '' }}" size="14">
+        <input name="note" placeholder="Why (e.g. voted no chow for Christmas Eve)" value="{{ x.note if x.status == 'none' else '' }}" size="14">
         <button class="btn small ghost">No chow this night</button></form>
     </details>{% endif %}
   </td></tr>
@@ -59,7 +59,7 @@
   <details class="edit"><summary>Start with someone else</summary>
     <select name="next_member"><option value="">{{ club.name(next_up) if next_up else '(next in order)' }}</option>{% for mid in s.order if mid != next_up %}<option value="{{ mid }}">{{ club.name(mid) }}</option>{% endfor %}</select></details>
 </form>
-<p class="hint">Holidays already marked "no chow" are skipped. Someone who can't do a night (see their limits below) keeps their turn and gets the next night they can do.</p>
+<p class="hint">Every open meeting night gets the next member in order, going around the list as many times as needed; holidays are filled like any other night. Nights already marked "No chow" (say, after the club votes on a holiday) are skipped. Someone who can't do a night (see their limits below) keeps their turn and gets the next night they can do.</p>
 
 <h2>Rotation</h2>
 <p class="hint">The same order every round; new members go at the bottom.</p>
