@@ -1,12 +1,12 @@
 // Click a column header in any table.list to sort by it. Cells may carry data-sort (e.g. ISO dates).
 document.querySelectorAll("table.list").forEach((table) => {
-  table.querySelectorAll("th").forEach((th, col) => {
+  table.querySelectorAll("thead th").forEach((th, col) => {
     th.style.cursor = "pointer";
     th.title = "Sort";
     th.addEventListener("click", () => {
       const body = table.tBodies[0];
       const dir = th.dataset.dir === "asc" ? "desc" : "asc";
-      table.querySelectorAll("th").forEach((h) => { delete h.dataset.dir; h.classList.remove("asc", "desc"); });
+      table.querySelectorAll("thead th").forEach((h) => { delete h.dataset.dir; h.classList.remove("asc", "desc"); });
       th.dataset.dir = dir; th.classList.add(dir);
       const key = (row) => {
         const cell = row.cells[col];
@@ -15,6 +15,7 @@ document.querySelectorAll("table.list").forEach((table) => {
         const n = parseFloat(t.replace(/[%,]/g, ""));
         return /^-?[\d.]+%?$/.test(t) ? n : t.toLowerCase();
       };
+      body.querySelectorAll("tr.yearrow").forEach((r) => r.remove());  // year headings only make sense by date
       const rows = [...body.rows].sort((a, b) => {
         const x = key(a), y = key(b);
         return (x < y ? -1 : x > y ? 1 : 0) * (dir === "asc" ? 1 : -1);

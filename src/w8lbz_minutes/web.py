@@ -498,7 +498,18 @@ async def passkey_login_verify(request: Request):
 
 # ---------------- archive ----------------
 
-PER_PAGE = 26  # meetings per archive page: about half a year
+PER_OPTIONS = (10, 25, 50, 0)  # list page sizes; 0 = all
+
+
+def paginate(items: list, p: str, per: str, default: int = 25) -> dict:
+    """One page of a long list. p and per come from the query string as text (junk falls back to defaults)."""
+    n = int(per) if per.isdigit() and int(per) in PER_OPTIONS else default
+    size = n or max(len(items), 1)
+    pages = max(1, -(-len(items) // size))
+    p = min(max(int(p) if p.isdigit() else 1, 1), pages)
+    rows = items[(p - 1) * size:p * size]
+    return {"rows": rows, "p": p, "pages": pages, "per": n, "options": PER_OPTIONS, "total": len(items),
+            "first": (p - 1) * size + 1 if rows else 0, "last": (p - 1) * size + len(rows)}
 
 
 def years() -> list[int]:
@@ -506,24 +517,12 @@ def years() -> list[int]:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, year: str = "", p: str = Query("1", alias="page")):
-    """Meetings grouped by year, newest first. With ?year=, that year alone, PER_PAGE at a time."""
+def index(request: Request, year: str = "", p: str = Query("1", alias="page"), per: str = ""):
+    """Meetings newest first, a page at a time, optionally one year only."""
     # The "All years" option sends year= (empty); anything that isn't a number means all years.
     year = int(year) if year.isdigit() else None
-    p = int(p) if p.isdigit() else 1
-    if year:
-        ms = [m for m in archive.meetings if m.date.year == year]
-        pages = max(1, -(-len(ms) // PER_PAGE))
-        p = min(max(p, 1), pages)
-        groups = [(year, ms[(p - 1) * PER_PAGE:p * PER_PAGE], len(ms))]
-    else:
-        pages = 1
-        groups = [(y, ms[:PER_PAGE], len(ms))
-                  for y in years() for ms in [[m for m in archive.meetings if m.date.year == y]]]
-    this_year = dt.date.today().year
-    open_year = year or (this_year if this_year in years() else next(iter(years()), None))
-    return page(request, "index.html", groups=groups, years=years(), year=year, open_year=open_year,
-                p=p, pages=pages)
+    ms = [m for m in archive.meetings if not year or m.date.year == year]
+    return page(request, "index.html", pg=paginate(ms, p, per), years=years(), year=year)
 
 
 @app.get("/meetings/{slug}", response_class=HTMLResponse)
@@ -586,7 +585,7 @@ def member(request: Request, mid: str):
 
 
 @app.get("/roster", response_class=HTMLResponse)
-def roster(request: Request):
+def roster(request: Request, status: str = "Active", p: str = Query("1", alias="page"), per: str = ""):
     """Everyone on the roster; contact details are on each member's own page."""
     def since(m):
         try:
@@ -595,8 +594,10 @@ def roster(request: Request):
             return None
     gone = ("inactive", "silent key")
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
-    return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
-                active=sum(m.status.lower() not in gone for m in ms),
+    statuses = sorted({m.status for m in ms}, key=lambda x: (x != "Active", x))
+    shown = [m for m in ms if status == "all" or m.status == status]
+    return page(request, "roster.html", pg=paginate([(m, since(m)) for m in shown], p, per, 50),
+                active=sum(m.status.lower() not in gone for m in ms), statuses=statuses, status=status,
                 is_officer=privileged(request))
 
 
@@ -682,7 +683,7 @@ def links(request: Request):
 
 
 @app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, period: str = "12m"):
+def stats(request: Request, period: str = "12m", p: str = Query("1", alias="page"), per: str = ""):
     """Attendance for the last 12 months (default), all time, or one year."""
     if period == "all":
         ms, label = archive.meetings, "on record"
@@ -691,7 +692,9 @@ def stats(request: Request, period: str = "12m"):
     else:
         period, cutoff = "12m", dt.date.today() - dt.timedelta(days=365)
         ms, label = [m for m in archive.meetings if m.date > cutoff], "in the last 12 months"
-    return page(request, "stats.html", s=archive.stats(ms), period=period, label=label, years=years())
+    st = archive.stats(ms)
+    return page(request, "stats.html", s=st, pg=paginate(st["rows"], p, per, 10),
+                period=period, label=label, years=years())
 
 
 @app.get("/guests", response_class=HTMLResponse)

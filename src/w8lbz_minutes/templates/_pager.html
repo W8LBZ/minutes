@@ -1,0 +1,7 @@
+{# Page size and page links for a long list. Needs pg = paginate(...) and request. #}
+{% macro size(pg) %}<label>Show <select name="per" onchange="this.form.submit()">{% for n in pg.options %}<option value="{{ n }}" {{ 'selected' if n == pg.per }}>{{ n or 'All' }}</option>{% endfor %}</select></label>{% endmacro %}
+{% macro links(pg, request) %}{% if pg.pages > 1 %}<p class="pager">
+  {% if pg.p > 1 %}<a class="btn small ghost" href="{{ request.url.include_query_params(page=pg.p - 1) }}">◀ Previous</a>{% endif %}
+  Page {{ pg.p }} of {{ pg.pages }} <span class="muted">({{ pg.first }}–{{ pg.last }} of {{ pg.total }})</span>
+  {% if pg.p < pg.pages %}<a class="btn small ghost" href="{{ request.url.include_query_params(page=pg.p + 1) }}">Next ▶</a>{% endif %}
+</p>{% endif %}{% endmacro %}

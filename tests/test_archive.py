@@ -86,10 +86,11 @@ def test_roster_contact_details_follow_sharing(tmp_path, monkeypatch):
     monkeypatch.setattr(web.authn, "member_for", lambda token: viewer["id"])
     client = TestClient(web.app)
 
-    html = client.get("/roster").text  # Bob, a regular member
-    assert "KD8AAA" in html and "Secretary" in html and "Mar 7, 2024" in html and "Silent Key" in html
+    html = client.get("/roster?status=all").text  # Bob, a regular member
+    assert "KD8AAA" in html and "Secretary" in html and "Mar 7, 2024" in html and "badge\">Silent Key" in html
     assert "419-555" not in html and "@example.org" not in html  # contact details live on member pages
-    assert html.index("Doe") < html.index("Timer")
+    assert html.index("Doe") < html.index("Old Timer")
+    assert "badge\">Silent Key" not in client.get("/roster").text  # Active only by default
     assert client.get("/roster/changes").status_code == 403     # officers only
 
     jane = client.get("/members/kd8aaa").text
@@ -124,22 +125,28 @@ def rows(html):
     return html.count('<tr><td data-sort=')
 
 
-def test_archive_groups_by_year_and_pages(client):
+def test_archive_pages_and_page_size(client):
     html = client.get("/").text
-    assert "All 30 meetings from 2024" in html  # 2024 is cut at a page and links to its own view
-    assert rows(html) == 26 + 2 + 1  # 2024 cut to one page, 2025, and this year
-    assert html.count("<details class=\"year\"") == 3 and html.count("<details class=\"year\" open") == 1
+    assert rows(html) == 25 and "Page 1 of 2" in html and html.count('class="yearrow"') == 3  # this year, 2025, 2024
+    assert rows(client.get("/?page=2").text) == 8
+    assert rows(client.get("/?per=0").text) == 33 and rows(client.get("/?per=10&page=4").text) == 3
     p1, p2 = client.get("/?year=2024").text, client.get("/?year=2024&page=2").text
-    assert rows(p1) == 26 and rows(p2) == 4 and "Page 2 of 2" in p2
-    assert rows(client.get("/?year=2024&page=99").text) == 4  # clamped to the last page
-    for junk in ("/?year=", "/?year=abc", "/?year=2024&page=x"):  # "All years" sends year= (empty)
+    assert rows(p1) == 25 and rows(p2) == 5 and "Page 2 of 2" in p2
+    assert rows(client.get("/?year=2024&page=99").text) == 5  # clamped to the last page
+    for junk in ("/?year=", "/?year=abc", "/?year=2024&page=x", "/?per=7", "/?per=x"):  # "All years" sends year=
         r = client.get(junk)
-        assert r.status_code == 200 and "<details" in r.text
+        assert r.status_code == 200 and rows(r.text) == 25
+
+
+def test_roster_shows_active_by_default(client):
+    html = client.get("/roster").text
+    assert "Status" in html and client.get("/roster?status=all").status_code == 200
 
 
 def test_stats_periods(client):
     assert "33 meetings on record" in client.get("/stats?period=all").text
-    assert "30 meetings in 2024" in client.get("/stats?period=2024").text
+    html = client.get("/stats?period=2024").text
+    assert "30 meetings in 2024" in html and "Page 1 of 3" in html
     assert "1 meeting in the last 12 months" in client.get("/stats").text
 
 def test_guests_page_moves_new_members_to_their_own_section(tmp_path, monkeypatch):
