@@ -4,6 +4,9 @@ What changed in each version of W8LBZ Minutes. Planned work is in [ROADMAP.md](R
 
 Versions follow [semantic versioning](https://semver.org): while the app is 0.x, the middle number goes up for new features and the last for fixes. Each version is a git tag (`v0.2.0`), and the app's footer shows the version that's running.
 
+## 0.5.1 (2026-11-07)
+- **Fixed:** after an update, pages could look broken until you forced your browser to reload (it kept the old styles). Browsers now fetch the new styles and scripts by themselves.
+
 ## 0.5.0 (2026-11-07)
 - **Business items are tracked** (new **Business** page in the top menu). Each Old or New Business item can have an owner and a due date, and it stays in Old Business every week until it's marked done; then it shows once as done in the minutes and drops off. Nothing gets lost when a week's minutes leave it out. Leaders change any item; members can update the ones they own, between meetings too. An item can be held for a later meeting (e.g. the President's State of the Club). Today's Old Business list was brought in as the starting point.
 - **Reminders:** the owner of a business item with a due date gets an email a few days before it's due, and once if it goes past due (daily at 8 am; test mode applies).
