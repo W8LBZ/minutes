@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% block title %}Updates{% endblock %}{% block body %}
+<h1>Updates</h1>
+{% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+{% if note %}<p class="msg ok">{{ note }}</p>{% endif %}
+
+<div class="cards">
+<article class="card">
+  <div class="card-head"><div class="card-text">Running <b>{{ running }}</b>{% if rel %} · latest release <b>{{ rel.version }}</b>{% endif %}</div>
+    <div class="topacts"><form method="post" action="/admin/updates/check" class="inline"><button class="act">↻ Check now</button></form></div></div>
+  {% if not rel %}<p class="muted">Couldn't reach GitHub to check for releases.</p>
+  {% elif not newer %}<p class="muted">You're up to date.</p>{% endif %}
+</article>
+
+{% if st.requested or st.running %}<article class="card">
+  <div class="card-text">⏳ Updating to {{ (st.running or st.requested).to }}, started {{ (st.running or st.requested).at|tsfull }} by {{ club.short((st.running or st.requested).by) }}.</div>
+  <p class="muted">The app restarts when it's done, usually within a minute or two. Reload this page to see the result.</p>
+</article>
+
+{% elif newer %}<article class="card">
+  <div class="card-text"><b>Version {{ newer.version }}</b> is available. <a href="{{ newer.url }}">Release on GitHub</a></div>
+  <form method="post" action="/admin/updates/run" class="modern"><input type="hidden" name="target" value="{{ newer.version }}">
+    {% if newer.deploy_notes %}<div class="msg err"><b>This release needs steps by hand.</b> Do these on CT103 first:
+      <ul>{% for n in newer.deploy_notes %}<li>{{ n }}</li>{% endfor %}</ul>
+      <label class="wk"><input type="checkbox" name="notes_done" value="1" required> I've done these steps</label></div>{% endif %}
+    <details><summary class="muted">What's in it</summary><pre class="relnotes">{{ newer.notes }}</pre></details>
+    <div class="formrow"><button class="btn" onclick="return confirm('Update the app to {{ newer.version }} now? It restarts, so anyone using it is interrupted for a moment.')">Update now</button></div>
+    <p class="hint">Runs the same update as <code>update.sh</code> on the server: the latest main from GitHub, then a restart. Avoid doing it during a meeting.</p>
+  </form>
+</article>{% endif %}
+
+{% if st.last %}<article class="card{{ '' if st.last.ok else ' overdue' }}">
+  <div class="card-text">{{ '✓' if st.last.ok else '✗' }} Last update{% if st.last.to %} to {{ st.last.to }}{% endif %}: {{ 'finished' if st.last.ok else 'failed' }} {{ st.last.finished|tsfull }}{% if st.last.by %}, asked for by {{ club.short(st.last.by) }}{% endif %}.</div>
+  <details><summary class="muted">Output</summary><pre class="relnotes">{{ st.last.output }}</pre></details>
+</article>{% endif %}
+</div>
+<p class="hint">Updating from here needs the updater installed on the server, which happens the first time <code>update.sh</code> runs with this version. If a click does nothing for several minutes, run <code>update.sh</code> by hand and check <code>journalctl -u w8lbz-minutes-update</code>.</p>
+{% endblock %}

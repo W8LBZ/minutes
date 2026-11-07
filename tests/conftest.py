@@ -16,3 +16,10 @@ def fresh_business(tmp_path, monkeypatch):
     d = tmp_path / "business-data"
     d.mkdir()
     monkeypatch.setattr(business, "DATA", d)
+
+
+@pytest.fixture(autouse=True)
+def no_update_check(monkeypatch):
+    """Pages for admins in admin mode check GitHub for a new release; never from the tests."""
+    from w8lbz_minutes import updates
+    monkeypatch.setattr(updates, "latest", lambda *a, **k: None)

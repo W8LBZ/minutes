@@ -170,3 +170,5 @@ ul.chowlog { max-width: 44rem; max-height: none; }
 form.modern input[name=note] { font: inherit; font-weight: normal; border: 1px solid #cfd3c4; border-radius: .55rem; padding: .55rem .7rem; }
 .nights .dateblk { width: 3.2rem; } ol.nights > li { grid-template-columns: 3.4rem 1fr auto; }
 .rot-name a { color: inherit; text-decoration: none; border-bottom: 1px dotted #9aa38a; } .rot-name a:hover { color: #2f5a1f; }
+pre.relnotes { white-space: pre-wrap; background: #f6f8f1; border-radius: .5rem; padding: .6rem .8rem; font-size: .88rem; max-height: 20rem; overflow-y: auto; }
+.adminbar a.updlink { color: #fff; font-weight: 600; margin-left: .6rem; }
