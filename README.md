@@ -82,6 +82,8 @@ In admin mode, a member's page has **View the app as …**: the app as that memb
 ## Changes and releases
 - Each PR adds a line under "Unreleased" in `CHANGELOG.md`, and removes its item from `ROADMAP.md` if it finishes one.
 - To release: in a PR, rename "Unreleased" to the new version and date and bump `version` in `pyproject.toml` (then `uv lock`). When it merges, the Release workflow tags the merge commit `vX.Y.Z` and publishes a GitHub release with that CHANGELOG section. Deploy with `update.sh`; the footer then shows the new version.
+- **Releases that need steps by hand** (a config change, a data file to copy, a new secret): add a line `- **Deploy notes:** …` to that version's CHANGELOG section, with any further steps indented under it. The admin Updates page shows them and asks the admin to confirm they're done before updating.
+- **Updating from the app:** admins in admin mode see "Version X is available" and an **Updates** page with **Update now**. It writes `update-request.json` in the data folder; the root-owned `w8lbz-minutes-update.path` unit sees it and runs `deploy/update-from-app.sh` (which runs `update.sh` and records the result). `update.sh` installs and enables that unit, so the first update after this feature arrives is still by hand.
 - Every pull request runs the tests (the Tests workflow).
 
 ## License

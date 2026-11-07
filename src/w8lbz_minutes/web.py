@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import ai, business, chow, console, membership, profile
+from . import ai, business, chow, console, membership, profile, updates
 from . import auth as authmod
 from .auth import Auth, _safe_next
 from .club import DATA, PREVIEW
@@ -154,7 +154,19 @@ def page(request: Request, name: str, **ctx) -> HTMLResponse:
         "can_lead": (archive.club.can_lead(mid) or admin_mode(request)) if mid else False,
         "is_admin": archive.club.is_admin(mid), "admin_until": getattr(request.state, "admin_until", None),
         "viewing_as": getattr(request.state, "viewing_as", None),
+        "update_available": _update_badge(request),
         "rp_id": authn.rp_id, **ctx})
+
+
+def _update_badge(request: Request) -> str | None:
+    """For admins in admin mode: the newer version, if there is one (cached check, see updates.py)."""
+    if not (getattr(request.state, "admin_until", None) and archive.club.is_admin(getattr(request.state, "real_member", None))):
+        return None
+    try:
+        rel = updates.available()
+    except Exception:
+        return None
+    return rel["version"] if rel else None
 
 
 def is_https(request: Request) -> bool:
@@ -648,6 +660,41 @@ def admin_confirm_link(request: Request, t: str = "", next: str = "/", mid: str 
                                 + "&next=" + quote(_safe_next(next)), status_code=303)
     _admin_on(request, mid, "email")
     return RedirectResponse(_safe_next(next), status_code=303)
+
+
+# ---------------- updating the app (admins, admin mode) ----------------
+
+@app.get("/admin/updates", response_class=HTMLResponse)
+def admin_updates(request: Request, error: str = "", note: str = "", mid: str = Depends(real_me)):
+    _admin(mid)
+    if not admin_mode(request):
+        return RedirectResponse("/admin/confirm?next=/admin/updates", status_code=303)
+    return page(request, "updates.html", running=updates.running(), rel=updates.latest(), st=updates.status(),
+                newer=updates.available(), error=error, note=note)
+
+
+@app.post("/admin/updates/check")
+def admin_updates_check(request: Request, mid: str = Depends(real_me)):
+    _admin(mid)
+    rel = updates.latest(force=True)
+    msg = "Couldn't reach GitHub." if rel is None else (
+        f"Version {rel['version']} is available." if updates.newer(rel["version"], updates.running()) else "You're up to date.")
+    return RedirectResponse("/admin/updates?note=" + quote(msg), status_code=303)
+
+
+@app.post("/admin/updates/run")
+def admin_updates_run(request: Request, target: str = Form(""), notes_done: int = Form(0), mid: str = Depends(real_me)):
+    _admin(mid)
+    if not admin_mode(request):
+        raise HTTPException(403, "Turn on admin mode first.")
+    try:
+        updates.request(mid, target, bool(notes_done))
+    except ValueError as e:
+        return RedirectResponse("/admin/updates?error=" + quote(str(e)), status_code=303)
+    _admin_log(request, update_requested=target)
+    _log.info("update to %s requested by %s", target, mid)
+    return RedirectResponse("/admin/updates?note=" + quote("Update started. The app restarts in a minute or two; "
+                                                           "reload this page to see the result."), status_code=303)
 
 
 @app.post("/admin/view-as")

@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for an update request from the W8LBZ minutes admin page
+
+[Path]
+PathExists=/var/lib/w8lbz-minutes/update-request.json
+Unit=w8lbz-minutes-update.service
+
+[Install]
+WantedBy=paths.target

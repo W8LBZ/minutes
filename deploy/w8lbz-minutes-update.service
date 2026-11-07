@@ -1,0 +1,7 @@
+[Unit]
+Description=Update the W8LBZ minutes app (asked for from its admin page)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/w8lbz-minutes/deploy/update-from-app.sh
+TimeoutStartSec=15min
