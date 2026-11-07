@@ -124,9 +124,13 @@ document.querySelectorAll("button.act[data-panel]").forEach((b) => b.addEventLis
   card.querySelectorAll(".panel").forEach((x) => (x.hidden = true));
   card.querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
   if (!wasOpen) { p.hidden = false; b.classList.add("on"); p.querySelector("textarea")?.focus(); }
+  // History lists the comments too, so don't show them twice.
+  const cs = card.querySelector(".comments");
+  if (cs) cs.hidden = !p.hidden && b.dataset.panel.startsWith("h");
 }));
 document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => {
   b.closest(".panel").hidden = true; b.closest(".card").querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
+  const cs = b.closest(".card").querySelector(".comments"); if (cs) cs.hidden = false;
 }));
 document.querySelectorAll("[data-more]").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll(`[data-group="${b.dataset.more}"]`).forEach((x) => (x.hidden = false)); b.remove();

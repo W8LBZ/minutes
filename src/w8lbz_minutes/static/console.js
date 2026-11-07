@@ -231,15 +231,25 @@
       floor = h("div", { class: "floor" }, h("h3", {}, rem.length ? "Who's next?" : "Everyone has reported"),
         h("p", { class: "hint" }, rem.length ? "Press “Suggest next” or call on someone." : "Use “Edit” to change a report, or move on to Old Business."));
     }
-    // Notes members sent in for tonight (Business page): read them out, then add them to the reports.
+    // Notes members sent in for tonight (Business page). Someone who's here anyway gives their own report.
+    const here = (id) => M.in_person.includes(id) || M.remote.includes(id);
+    const noteCard = (n) => h("div", { class: "notecard" },
+      h("div", {}, h("b", {}, n.name), here(n.by) ? h("span", { class: "badge" }, "here tonight") : null),
+      h("div", { class: "notetext" }, n.text),
+      h("div", { class: "notebtns" },
+        here(n.by)
+          ? h("button", { class: "btn small", onclick: async () => {
+              S.reports[n.by] = [S.reports[n.by], n.text].filter(Boolean).join(" ");
+              await noteStatus(n, "read"); } }, "Use it in their report")
+          : h("button", { class: "btn small", onclick: async () => {
+              S.others.push(`${n.name} sent a note: ${n.text}`);
+              await noteStatus(n, "read"); } }, "Read it out, add it to the minutes"),
+        h("button", { class: "btn small ghost", onclick: () => noteStatus(n, "dismissed") }, "Skip")));
     const notes = (D.business.notes || []).length ? h("div", { class: "notesbox" },
       h("h3", {}, `Notes sent in (${D.business.notes.length})`),
-      h("p", { class: "hint" }, "Members who sent a note for tonight. Read it out, then add it to the reports."),
-      D.business.notes.map((n) => h("div", { class: "bizcomment" }, h("b", {}, `${n.name}: `), n.text, " ",
-        h("button", { class: "btn small", onclick: async () => {
-          S.others.push(`${n.name} sent a note: ${n.text}`);
-          await noteStatus(n, "read"); } }, "Add to reports"),
-        h("button", { class: "btn small ghost", onclick: () => noteStatus(n, "dismissed") }, "Skip")))) : null;
+      h("p", { class: "notelead" }, "Members sent these for tonight. Read each one out, then add it to the minutes. " +
+        "If they came after all, let them give their report and skip the note (or use it in their report)."),
+      D.business.notes.map(noteCard)) : null;
     const others = h("div", {}, h("h3", { style: "margin-top:1.2rem" }, "Other reports"),
       h("p", { class: "hint" }, "For news passed along by someone who isn't present, e.g. “Jeremy sent a message recommending…”."),
       itemRows(S.others, (arr) => { S.others = arr; }));
