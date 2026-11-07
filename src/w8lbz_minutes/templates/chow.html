@@ -63,22 +63,48 @@
 
 <h2>Rotation</h2>
 <p class="hint">The same order every round. New members join at the end of the current round (just before whoever is next), so everyone already on the list goes first.</p>
-<ol class="rotation">{% for mid in s.order %}{% set c = s.constraints.get(mid) %}<li>
-  <span class="who"><span class="n">{{ loop.index }}.</span> {{ club.name(mid) }}{% if mid == next_up %} <span class="badge">next</span>{% endif %}</span>
-  {% if c %}<span class="muted small">{% if c.not_weeks %}not {{ c.not_weeks|join(', ') }}{{ ' week' }} of the month{% endif %}{% for a, b in c.away %} · away {{ fmt(a) }}–{{ fmt(b) }}{% endfor %}{% if c.note %} · {{ c.note }}{% endif %}</span>{% endif %}
-  <span class="ops">
-    {% for op, label in (('up', '↑'), ('down', '↓')) %}<form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="{{ op }}"><button class="btn small ghost" title="Move {{ op }}">{{ label }}</button></form>{% endfor %}
-    <details class="edit"><summary>Limits</summary>
-      <form method="post" action="/chow/constraints"><input type="hidden" name="member" value="{{ mid }}">
-        Can't do week: {% for w in range(1, 6) %}<label><input type="checkbox" name="not_weeks" value="{{ w }}" {{ 'checked' if c and w in c.not_weeks }}>{{ w }}</label> {% endfor %}<br>
-        Away from <input type="date" name="away_from" value="{{ c.away[0][0] if c and c.away }}"> to <input type="date" name="away_to" value="{{ c.away[0][1] if c and c.away }}"><br>
-        Note <input name="note" value="{{ c.note if c }}" size="24"> <button class="btn small">Save</button></form>
-      <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="remove"><button class="btn small ghost" onclick="return confirm('Take {{ club.name(mid) }} out of the rotation?')">Take out of rotation</button></form>
-    </details></span>
+{% set ord = {1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th'} %}
+<ol class="rotation rotlist">{% for mid in s.order %}{% set c = s.constraints.get(mid) %}<li class="{{ 'next' if mid == next_up }}">
+  <span class="num">{{ loop.index }}</span>
+  <div class="rot-main">
+    <div class="rot-name">{{ club.name(mid) }}{% if mid == next_up %} <span class="badge">next</span>{% endif %}</div>
+    {% if c %}<div class="rot-limits">
+      {% if c.not_weeks %}<span class="chip">🚫 not the {% for w in c.not_weeks %}{{ ord[w] }}{{ ', ' if not loop.last }}{% endfor %} {{ 'week' if c.not_weeks|length == 1 else 'weeks' }}</span>{% endif %}
+      {% for a, b in c.away %}<span class="chip">✈ away {{ fmt(a) }} – {{ fmt(b) }}</span>{% endfor %}
+      {% if c.note %}<div class="rot-note">{{ c.note }}</div>{% endif %}
+    </div>{% endif %}
+  </div>
+  <div class="rot-ops">
+    {% for op, label in (('up', '↑'), ('down', '↓')) %}<form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="{{ op }}"><button class="act" title="Move {{ op }}">{{ label }}</button></form>{% endfor %}
+    <button type="button" class="act" data-panel="l{{ mid }}" title="Weeks they can't do, time away, a note">Limits</button>
+  </div>
+  <div class="panel rot-panel" id="l{{ mid }}" hidden>
+    <form method="post" action="/chow/constraints" class="modern"><input type="hidden" name="member" value="{{ mid }}">
+      <div class="weeks"><b>Can't do the</b> {% for w in range(1, 6) %}<label class="wk"><input type="checkbox" name="not_weeks" value="{{ w }}" {{ 'checked' if c and w in c.not_weeks }}> {{ ord[w] }}</label>{% endfor %} <b>week of the month</b></div>
+      <div class="formrow">
+        <label>Away from<input type="date" name="away_from" value="{{ c.away[0][0] if c and c.away }}"></label>
+        <label>to<input type="date" name="away_to" value="{{ c.away[0][1] if c and c.away }}"></label>
+      </div>
+      <label>Note<textarea name="note" rows="2" maxlength="120" placeholder="e.g. Winters in Florida">{{ c.note if c }}</textarea></label>
+      <div class="formrow"><button class="btn small">Save</button> <button type="button" class="btn small ghost" data-close>Cancel</button></div>
+    </form>
+    <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="remove"><button class="btn small ghost" onclick="return confirm('Take {{ club.name(mid) }} out of the rotation?')">Take out of rotation</button></form>
+  </div>
 </li>{% endfor %}</ol>
 {% if s.pending %}<h3>Taken out of the rotation</h3>
-<ul class="rotation">{% for mid in s.pending if mid in club.members %}<li><span class="who">{{ club.name(mid) }}</span>
-  <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="add"><button class="btn small ghost">Add at the bottom</button></form></li>{% endfor %}</ul>{% endif %}
+<ul class="rotation rotlist">{% for mid in s.pending if mid in club.members %}<li><span class="num">–</span><div class="rot-main"><div class="rot-name">{{ club.name(mid) }}</div></div>
+  <div class="rot-ops"><form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="add"><button class="act">Add back at the bottom</button></form></div></li>{% endfor %}</ul>{% endif %}
+<script>
+document.querySelectorAll(".rotlist button.act[data-panel]").forEach((b) => b.addEventListener("click", () => {
+  const p = document.getElementById(b.dataset.panel), open = p.hidden;
+  document.querySelectorAll(".rot-panel").forEach((x) => (x.hidden = true));
+  document.querySelectorAll(".rotlist button.act").forEach((x) => x.classList.remove("on"));
+  if (open) { p.hidden = false; b.classList.add("on"); }
+}));
+document.querySelectorAll(".rot-panel [data-close]").forEach((b) => b.addEventListener("click", () => {
+  b.closest(".rot-panel").hidden = true; document.querySelectorAll(".rotlist button.act").forEach((x) => x.classList.remove("on"));
+}));
+</script>
 
 {% elif tab == 'history' %}
 <h2>Past nights</h2>

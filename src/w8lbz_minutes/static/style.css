@@ -137,3 +137,21 @@ form.modern .formrow label { margin: 0; } form.modern .hint { font-weight: norma
 .combo-menu li span { color: #778; font-size: .85rem; } .combo-menu li.none { color: #778; font-style: italic; }
 .combo-menu li:hover, .combo-menu li.at { background: #eef2e6; }
 form.modern input[type=date] { height: 2.75rem; box-sizing: border-box; } form.modern .combo > input { height: 2.75rem; }
+/* Chow rotation */
+ol.rotlist, ul.rotlist { max-width: 44rem; padding: 0; margin: .5rem 0 1.2rem; list-style: none; border: 1px solid #e1e4d8;
+  border-radius: .8rem; overflow: hidden; box-shadow: 0 1px 3px rgba(40, 50, 20, .07); background: #fff; }
+ol.rotlist > li, ul.rotlist > li { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: .2rem .7rem; align-items: start;
+  padding: .55rem .9rem; border-bottom: 1px solid #eceee6; }
+ol.rotlist > li:last-child, ul.rotlist > li:last-child { border-bottom: 0; }
+ol.rotlist > li:nth-child(even), ul.rotlist > li:nth-child(even) { background: #f6f8f1; }
+ol.rotlist > li.next { background: #eaf2dc; box-shadow: inset 4px 0 0 #5b7a2f; }
+.rotlist .num { width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #eef1e6; color: #556; display: grid; place-items: center;
+  font-size: .85rem; font-weight: 600; } .rotlist li.next .num { background: #5b7a2f; color: #fff; }
+.rot-main { min-width: 0; padding-top: .15rem; } .rot-name { font-weight: 600; }
+.rot-limits { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
+.rot-note { flex-basis: 100%; color: #556; font-size: .9rem; overflow-wrap: anywhere; }
+.rot-ops { display: flex; gap: .3rem; align-items: center; } .rot-ops form { margin: 0; display: inline; }
+.rot-ops button.act { font-size: .85rem; padding: .2rem .65rem; }
+.rot-panel { grid-column: 1 / -1; margin-top: .3rem; }
+.rot-panel .weeks { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; margin: .2rem 0 .4rem; font-size: .92rem; }
+.rot-panel label.wk { display: inline-flex; gap: .25rem; align-items: center; font-weight: normal; flex-direction: row; margin: 0; }
