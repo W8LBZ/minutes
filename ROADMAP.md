@@ -15,6 +15,9 @@ The schedule, rotation, swaps, meeting-night records and the minutes' Upcoming C
 - **With the minutes email:** a printable chow list (PDF or .xlsx) attached, replacing the Secretary's spreadsheet.
 
 ## Admin tools
+- **Update from the app:** an "Update available" notice for admins (the running version vs. the latest GitHub release) and an **Update now** button.
+  - The app runs as the unprivileged `minutes` user, so it can't run `update.sh` itself: it would drop a request file that a root-owned systemd path unit watches, which runs `update.sh` and logs the result for the admin to see.
+  - **Releases that need extra steps** (a config change, a data file to copy, a new secret) say so in a "Deploy notes" part of their CHANGELOG section. The app shows those notes and won't offer one-click update for that release until an admin confirms the steps are done.
 - **Act as a member:** View as is read-only today. A later option could let an admin make changes as the member to reproduce a problem, clearly logged and with emails still going to the admin, not the member.
 
 ## Club calendars
