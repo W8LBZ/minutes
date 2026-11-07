@@ -13,7 +13,9 @@ The first use imports the last submitted minutes' Old and New Business, so nothi
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
+import fcntl
 import json
 import os
 import secrets
@@ -43,6 +45,18 @@ def save(s: dict) -> None:
     tmp.write_text(json.dumps(s, indent=1))
     os.chmod(tmp, 0o600)
     tmp.replace(p)
+
+
+@contextlib.contextmanager
+def locked():
+    """Held around load-change-save, by the web app and the daily reminders job alike (they're separate processes)."""
+    DATA.mkdir(parents=True, exist_ok=True)
+    with open(DATA / "business.lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def seed(s: dict, meetings: list, by: str | None = None) -> int:
@@ -197,3 +211,47 @@ def view(club: Club, x: dict, today: str) -> dict:
     """An item for the console and the Business page."""
     return {**x, "owner_name": club.name(x["owner"]) if x["owner"] else None,
             "overdue": bool(x["status"] == "open" and x["due"] and x["due"] < today)}
+
+
+# ---------------- reminders (the daily job: `w8lbz-minutes reminders`) ----------------
+
+def due_reminders(s: dict, today: dt.date, days_before: int = 3) -> dict[str, list[tuple[dict, str]]]:
+    """Owner -> [(item, "soon" | "overdue")] not yet reminded. Each item gets at most one "soon"
+    reminder (within days_before of its due date) and one "overdue" reminder (the day after)."""
+    out: dict[str, list[tuple[dict, str]]] = {}
+    for x in s["items"]:
+        if x["status"] != "open" or not x["owner"] or not x["due"]:
+            continue
+        due = dt.date.fromisoformat(x["due"])
+        sent = x.setdefault("reminded", {})
+        if due < today and sent.get("overdue") != x["due"]:
+            kind = "overdue"
+        elif today <= due <= today + dt.timedelta(days=days_before) and sent.get("soon") != x["due"]:
+            kind = "soon"
+        else:
+            continue
+        out.setdefault(x["owner"], []).append((x, kind))
+    return out
+
+
+def reminder_email(club: Club, mid: str, items: list[tuple[dict, str]], today: dt.date, url: str) -> tuple[str, str]:
+    m = club.members[mid]
+
+    def when(x, kind):
+        due = dt.date.fromisoformat(x["due"])
+        if kind == "overdue":
+            return f"was due {due.strftime('%A, %B %-d')}"
+        days = (due - today).days
+        return f"due {due.strftime('%A, %B %-d')}" + (" (today)" if days == 0 else " (tomorrow)" if days == 1 else "")
+    late = any(k == "overdue" for _, k in items)
+    lines = "\n".join(f"- {x['text']}\n  {when(x, k)}" for x, k in items)
+    subject = f"{club.info.get('callsign', 'W8LBZ')} club business: " + ("past due" if late else "coming due")
+    body = (f"Hi {m.first},\n\nA reminder about club business you're looking after:\n\n{lines}\n\n"
+            f"If it's finished, mark it done (or change the date) here: {url}/business\n"
+            f"Or just bring it up at the next meeting.\n\n73,\n{club.info.get('callsign', 'W8LBZ')} Minutes")
+    return subject, body
+
+
+def mark_reminded(items: list[tuple[dict, str]]) -> None:
+    for x, kind in items:
+        x.setdefault("reminded", {})[kind] = x["due"]

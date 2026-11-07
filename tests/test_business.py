@@ -98,3 +98,23 @@ def test_business_page_permissions(env, monkeypatch, tmp_path):
     r = c.post("/business/add", data={"text": "Order a new feedline", "meeting": "2026-11-05"},
                headers={"Accept": "application/json"})
     assert [x["text"] for x in r.json()["new"]] == ["Order a new feedline"]
+
+
+def test_reminders_once_each_and_only_owners(env):
+    club, a = env
+    s = business.load()
+    soon = business.add(s, "Book the park", "sec", owner="amy", due="2026-12-03")
+    late = business.add(s, "Return the borrowed antenna", "sec", owner="amy", due="2026-11-20")
+    business.add(s, "Nobody's job", "sec", due="2026-12-01")                          # no owner: nobody to remind
+    business.close(s, business.add(s, "Finished", "sec", owner="bob", due="2026-12-02")["id"], "sec")
+    today = dt.date(2026, 11, 30)
+    due = business.due_reminders(s, today, days_before=3)
+    assert list(due) == ["amy"] and [(x["text"], k) for x, k in due["amy"]] == [
+        ("Book the park", "soon"), ("Return the borrowed antenna", "overdue")]
+    subject, body = business.reminder_email(club, "amy", due["amy"], today, "https://x")
+    assert "past due" in subject and "due Thursday, December 3" in body and "was due Friday, November 20" in body
+    business.mark_reminded(due["amy"])
+    assert business.due_reminders(s, today) == {} and business.due_reminders(s, dt.date(2026, 12, 2)) == {}
+    business.edit(s, soon["id"], "amy", due="2026-12-10")                              # a new date: a new reminder
+    assert [x["text"] for x, _ in business.due_reminders(s, dt.date(2026, 12, 8))["amy"]] == ["Book the park"]
+    assert late["reminded"] == {"overdue": "2026-11-20"}

@@ -5,7 +5,6 @@ Planned work, roughly in priority order. Each item becomes its own branch and PR
 Finished work moves to [CHANGELOG.md](CHANGELOG.md).
 
 ## Next
-- **Business item reminders** (see below).
 - **Chow list, what's left** (see below): reminders, the calendar, and the chow list in the minutes email.
 - **Email the minutes to the whole club:** remove test mode (`email.only_to`) once the club is ready.
 
@@ -17,10 +16,6 @@ The schedule, rotation, swaps, meeting-night records and the minutes' Upcoming C
 
 ## Admin tools
 - **Act as a member:** View as is read-only today. A later option could let an admin make changes as the member to reproduce a problem, clearly logged and with emails still going to the admin, not the member.
-
-## Tracked business items, what's left
-Items, owners, due dates, carry-until-done and holding an item for a later meeting are done.
-- **Reminders:** the owner gets an email a few days before the due date, and when it's overdue (needs a daily timer on CT103, like the roster sync).
 
 ## Club calendars
 The club's Google calendars ("Meetings & Events", "Chow", "Community Events", "Planning") aren't relied on yet; the app keeping them current would make them something members can trust.

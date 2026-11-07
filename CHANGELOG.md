@@ -6,6 +6,7 @@ Versions follow [semantic versioning](https://semver.org): while the app is 0.x,
 
 ## Unreleased
 - **Business items are tracked** (new **Business** page in the top menu). Each Old or New Business item can have an owner and a due date, and it stays in Old Business every week until it's marked done; then it shows once as done in the minutes and drops off. Nothing gets lost when a week's minutes leave it out. Leaders change any item; members can update the ones they own, between meetings too. An item can be held for a later meeting (e.g. the President's State of the Club). Today's Old Business list was brought in as the starting point.
+- **Reminders:** the owner of a business item with a due date gets an email a few days before it's due, and once if it goes past due (daily at 8 am; test mode applies).
 
 ## 0.4.0 (2026-11-06)
 - **Sign-in & passkeys** is now a tab of Your profile, which tidies the menu under your name.

@@ -211,7 +211,6 @@ def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depe
 
 
 # ---------------- tracked business items ----------------
-_business_lock = threading.Lock()
 
 
 def can_lead_now(request: Request) -> bool:
@@ -220,7 +219,7 @@ def can_lead_now(request: Request) -> bool:
 
 def business_change(request: Request, fn, meeting: str = "", back: str = "/business"):
     """Run fn(state) under the lock, save, and refresh that meeting's draft minutes. JSON for the console."""
-    with _business_lock:
+    with business.locked():
         s = console.business_state(archive)
         try:
             fn(s)
