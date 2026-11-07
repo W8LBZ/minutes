@@ -334,6 +334,24 @@ def _preview_outbox(recipients, subject, body, attachments, only_to, reply_to) -
     return len(allowed)
 
 
+EMAIL_LOG_KEEP = 1000  # entries kept in email-log.jsonl
+
+
+def _email_log(entry: dict) -> None:
+    """Live site: every email the app sends or holds back (test mode), for admins' Email log page."""
+    p = DATA / "email-log.jsonl"
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a") as f:
+            f.write(json.dumps({"at": int(time.time()), **entry}) + "\n")
+        p.chmod(0o600)
+        lines = p.read_text().splitlines()
+        if len(lines) > EMAIL_LOG_KEEP * 1.5:
+            p.write_text("\n".join(lines[-EMAIL_LOG_KEEP:]) + "\n")
+    except OSError:
+        log.exception("couldn't write the email log")
+
+
 def send_email(to: str | list[str], subject: str, body: str, attachments: list[tuple[str, bytes, str]] = (),
                only_to: set[str] | None = None, reply_to: str | None = None) -> int:
     """Send through SMTP (Gmail by default) using W8LBZ_SMTP_* environment variables.
@@ -345,19 +363,35 @@ def send_email(to: str | list[str], subject: str, body: str, attachments: list[t
     recipients = [to] if isinstance(to, str) else list(to)
     if PREVIEW:
         return _preview_outbox(recipients, subject, body, attachments, only_to, reply_to)
+    withheld = []
     if only_to is not None:
         allowed = [r for r in recipients if r.strip().lower() in only_to]
-        if len(allowed) < len(recipients):
+        withheld = [r for r in recipients if r not in allowed]
+        if withheld:
             log.warning("email test mode: withheld %r from %d recipient(s) not in email.only_to",
-                        subject, len(recipients) - len(allowed))
+                        subject, len(withheld))
         recipients = allowed
+    entry = {"to": recipients, "withheld": withheld, "subject": subject, "body": body, "reply_to": reply_to,
+             "attachments": [a[0] for a in attachments]}
     if not recipients:
+        _email_log({**entry, "status": "held back (test mode)"})
         return 0
     user = os.environ.get("W8LBZ_SMTP_USER")
     password = (os.environ.get("W8LBZ_SMTP_PASSWORD") or "").replace(" ", "")  # Google shows app passwords in groups
     if not (user and password):
         log.warning("SMTP not configured; email to %s not sent:\n%s\n%s", ", ".join(recipients), subject, body)
+        _email_log({**entry, "status": "not sent (no SMTP settings)"})
         return 0
+    try:
+        sent = _smtp_send(recipients, subject, body, attachments, reply_to, user, password)
+    except Exception as e:
+        _email_log({**entry, "status": f"failed: {e}"[:200]})
+        raise
+    _email_log({**entry, "status": "sent"})
+    return sent
+
+
+def _smtp_send(recipients, subject, body, attachments, reply_to, user, password) -> int:
     reply_to = reply_to or os.environ.get("W8LBZ_SMTP_REPLY_TO")
     host, port = os.environ.get("W8LBZ_SMTP_HOST", "smtp.gmail.com"), int(os.environ.get("W8LBZ_SMTP_PORT", "587"))
     with smtplib.SMTP(host, port, timeout=30) as s:

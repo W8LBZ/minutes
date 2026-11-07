@@ -5,7 +5,7 @@
 {% if sent %}<p class="msg ok">We emailed a link to <b>{{ email }}</b>. Open it in this browser within 5 minutes.</p>{% endif %}
 {% if passkey %}
 <p><button class="btn" id="confirm">Confirm with your passkey</button> <span id="pkmsg" class="muted"></span></p>
-<script src="/static/auth.js"></script>
+<script src="/static/auth.js?v={{ ASSETS }}"></script>
 <script>
 document.getElementById("confirm").onclick = async () => {
   const msg = document.getElementById("pkmsg"); msg.textContent = "";

@@ -22,7 +22,7 @@
 
   <p class="muted small">Members only. If your email address has changed, ask a club officer to update the roster.</p>
 </div>
-<script src="/static/auth.js"></script>
+<script src="/static/auth.js?v={{ ASSETS }}"></script>
 <script>
 if (passkeysSupported() && location.hostname === {{ rp_id|tojson }}) {
   document.getElementById("pkbox").hidden = false;
