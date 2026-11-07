@@ -63,7 +63,7 @@ document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("cli
   {% for c in x.comments or [] %}<div class="comment"><span class="who">{{ club.short(c.by) }}</span> <span class="muted small">{{ c.at|tsfull }}</span>
     {% if leader or c.by == me.id %}<form method="post" action="/business/{{ x.id }}/comments/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')"><button class="linkbtn" title="Delete this comment">Delete</button></form>{% endif %}
     <div>{{ c.text }}</div></div>{% endfor %}
-  <div class="actions">
+  <div class="itemacts">
     <button type="button" class="act" data-panel="c{{ x.id }}">Comment</button>
     {% if mine %}<button type="button" class="act" data-panel="e{{ x.id }}">Edit</button>
     <form method="post" action="/business/{{ x.id }}/done" class="inline" onsubmit="return confirm('Mark this item done? It shows as done in the next minutes, then drops off.')"><button class="act">Mark done</button></form>{% endif %}
