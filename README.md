@@ -80,7 +80,8 @@ In admin mode, a member's page has **View the app as …**: the app as that memb
 
 ## Changes and releases
 - Each PR adds a line under "Unreleased" in `CHANGELOG.md`, and removes its item from `ROADMAP.md` if it finishes one.
-- To release: rename "Unreleased" to the new version and date, bump `version` in `pyproject.toml` (then `uv lock`), merge, and tag the merge commit (`git tag v0.3.0 && git push origin v0.3.0`). Deploy with `update.sh`; the footer then shows the new version.
+- To release: in a PR, rename "Unreleased" to the new version and date and bump `version` in `pyproject.toml` (then `uv lock`). When it merges, the Release workflow tags the merge commit `vX.Y.Z` and publishes a GitHub release with that CHANGELOG section. Deploy with `update.sh`; the footer then shows the new version.
+- Every pull request runs the tests (the Tests workflow).
 
 ## License
 Copyright © 2026 Jim Flattery, KO4CGQ.
