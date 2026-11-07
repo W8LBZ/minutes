@@ -30,12 +30,12 @@
     {% if x.due %}<span class="chip{{ ' late' if x.overdue }}">⏰ due {{ fmt(x.due) }}{% if x.overdue %} · overdue{% endif %}</span>{% endif %}
     {% if x.agenda and x.agenda > today %}<span class="chip">⏸ on the agenda for {{ fmt(x.agenda) }}</span>{% endif %}
     {% if x.quiet %}<span class="chip warn" title="Nothing has changed on it for weeks">quiet for a while: still on?</span>{% endif %}
-    <span class="chip">🗓 since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a></span>
+    <span class="chip">📅 since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a></span>
   </div>
   {% if cs %}<div class="comments">
     {% if cs|length > 2 %}<button type="button" class="linkbtn more" data-more="m{{ x.id }}">Show all {{ cs|length }} comments</button>{% endif %}
     {% for c in cs %}<div class="comment"{% if loop.revindex > 2 %} data-group="m{{ x.id }}" hidden{% endif %}>
-      <span class="who">{{ club.short(c.by) }}</span> <span class="muted small">{{ c.at|tsfull }}</span>
+      <span class="chip">👤 <a href="/members/{{ c.by }}">{{ club.short(c.by) }}</a></span> <span class="muted small">{{ c.at|tsfull }}</span>
       {% if leader or c.by == me.id %}<form method="post" action="/business/{{ x.id }}/comments/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')"><button class="linkbtn" title="Delete this comment">Delete</button></form>{% endif %}
       <div class="ctext">{{ c.text }}</div></div>{% endfor %}
   </div>{% endif %}
@@ -91,7 +91,7 @@
       <button type="button" class="act" data-panel="h{{ x.id }}" title="Changes and comments">🕘 History ({{ x.history|length + (x.comments or [])|length }})</button>
     </div></div>
   <div class="card-meta">{% if x.owner %}<span class="chip">👤 {{ x.owner_name }}</span>{% endif %}<span class="chip">✓ done {{ fmt(x.closed) }}</span>
-    <span class="chip">🗓 since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a></span></div>
+    <span class="chip">📅 since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a></span></div>
   <div class="panel" id="h{{ x.id }}" hidden>{{ timeline(x) }}</div>
 </article>{% else %}<p class="muted">Nothing yet.</p>{% endfor %}</div>
 
