@@ -70,6 +70,8 @@ def monthday(md: str | None) -> str:
 
 
 templates.env.filters["monthday"] = monthday
+templates.env.filters["tsfull"] = lambda t: (dt.datetime.fromtimestamp(t).strftime(DATES["list"] + ", %-I:%M %p")
+                                             .replace("AM", "am").replace("PM", "pm")) if t else ""
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"), PREVIEW=PREVIEW)
 

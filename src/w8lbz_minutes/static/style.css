@@ -94,3 +94,8 @@ section.suggestions { border: 1px solid #c9c2e6; background: #f6f4fc; border-rad
 button.linkbtn { background: none; border: 0; color: #667; cursor: pointer; font: inherit; font-size: .85rem; padding: 0 .2rem; }
 ul.history { list-style: none; padding-left: .5rem; } ul.history li { margin: .25rem 0; }
 section.notes { border: 1px solid #d9dccf; border-radius: .5rem; padding: .2rem 1rem .7rem; margin: 1rem 0; }
+.actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .35rem; } .actions form { margin: 0; }
+button.act { font: inherit; font-size: .88rem; padding: .2rem .7rem; border: 1px solid #c9ccbf; border-radius: 1rem; background: #fff; color: #2f3b1f; cursor: pointer; }
+button.act:hover { background: #eef2e6; } button.act.on { background: #2f3b1f; color: #fff; border-color: #2f3b1f; }
+.panel { border-left: 3px solid #c9ccbf; margin: .5rem 0 .2rem; padding: .1rem 0 .1rem .8rem; }
+.comment .who { font-weight: 600; }

@@ -207,6 +207,7 @@
         h("h3", {}, `${fullName(k)} has the floor`),
         k.startsWith("g:") && inviteDue(M.guests.find((g) => "g:" + g.name === k) || { name: k.slice(2) })
           ? h("div", { class: "invitebox" }, `This is ${k.slice(2).split(" ")[0]}'s ${ordinal(visitNo(M.guests.find((g) => "g:" + g.name === k)))} visit. ${INVITE}.`) : null,
+        (D.business.notes || []).filter((n) => n.by === k).map((n) => h("div", { class: "bizcomment" }, h("b", {}, "They sent a note: "), n.text)),
         past.length ? h("div", {}, h("div", { class: "hint" }, "Follow up on what they said before:"),
           past.map(([d, t]) => h("div", { class: "past" }, h("b", {}, d + ": "), t))) : h("p", { class: "hint" }, k.startsWith("g:") ? "Guest: ask what brought them in, and their license and callsign." : "No earlier reports on record."),
         ta,
@@ -220,16 +221,18 @@
         h("p", { class: "hint" }, rem.length ? "Press “Suggest next” or call on someone." : "Use “Edit” to change a report, or move on to Old Business."));
     }
     // Notes members sent in for tonight (Business page): read them out, then add them to the reports.
-    const notes = (D.business.notes || []).length ? h("div", { class: "notesbox" }, h("h3", {}, "Notes sent in"),
+    const notes = (D.business.notes || []).length ? h("div", { class: "notesbox" },
+      h("h3", {}, `Notes sent in (${D.business.notes.length})`),
+      h("p", { class: "hint" }, "Members who sent a note for tonight. Read it out, then add it to the reports."),
       D.business.notes.map((n) => h("div", { class: "bizcomment" }, h("b", {}, `${n.name}: `), n.text, " ",
         h("button", { class: "btn small", onclick: async () => {
           S.others.push(`${n.name} sent a note: ${n.text}`);
           await noteStatus(n, "read"); } }, "Add to reports"),
         h("button", { class: "btn small ghost", onclick: () => noteStatus(n, "dismissed") }, "Skip")))) : null;
-    const others = h("div", {}, notes, h("h3", { style: "margin-top:1.2rem" }, "Other reports"),
+    const others = h("div", {}, h("h3", { style: "margin-top:1.2rem" }, "Other reports"),
       h("p", { class: "hint" }, "For news passed along by someone who isn't present, e.g. “Jeremy sent a message recommending…”."),
       itemRows(S.others, (arr) => { S.others = arr; }));
-    return h("div", {}, h("h2", {}, "Community Reports"), h("div", { class: "cols2" }, queue, h("div", {}, floor, others)));
+    return h("div", {}, h("h2", {}, "Community Reports"), notes, h("div", { class: "cols2" }, queue, h("div", {}, floor, others)));
   }
 
   // ---------- plain list sections ----------
