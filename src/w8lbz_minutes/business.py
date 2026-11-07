@@ -53,8 +53,21 @@ def seed(s: dict, meetings: list, by: str | None = None) -> int:
     last = next((m for m in meetings if m.status != "draft"), None)  # meetings are newest first
     if not last:
         return 0
+    done = [m for m in meetings if m.status != "draft"]
+
+    def norm(t: str) -> str:
+        return " ".join(t.lower().split())
+
+    def business_lines(m) -> set[str]:
+        return {norm(i.text) for i in m.items("Old Business") + m.items("New Business")}
     for i in last.items("Old Business") + last.items("New Business"):
-        add(s, i.text, by, opened=last.slug, note="carried over from the minutes")
+        # When it first came up: walk back while each earlier meeting still has the same line.
+        opened = last.slug
+        for m in done[done.index(last) + 1:]:
+            if norm(i.text) not in business_lines(m):
+                break
+            opened = m.slug
+        add(s, i.text, by, opened=opened, note="carried over from the minutes")
     return len(s["items"])
 
 

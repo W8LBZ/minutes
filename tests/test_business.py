@@ -22,6 +22,7 @@ def env(tmp_path, monkeypatch):
     club = Club(FIX / "test-club.yaml", roster=PEOPLE)
     meetings = tmp_path / "meetings"
     meetings.mkdir()
+    Meeting(date=dt.date(2026, 10, 22), status="published", sections={"New Business": [Item("Club  patches for hats")]}).save(meetings)
     Meeting(date=dt.date(2026, 10, 29), status="published", sections={
         "Old Business": [Item("Club patches for hats")], "New Business": [Item("Field Day at Osborn Park?")]}).save(meetings)
     return club, Archive(meetings, club)
@@ -33,6 +34,7 @@ def test_items_carry_until_done(env):
     assert [i.text for i in m.items("Old Business")] == ["Club patches for hats", "Field Day at Osborn Park?"]  # seeded
     s = business.load()
     patches, park = s["items"]
+    assert (patches["opened"], park["opened"]) == ("2026-10-22", "2026-10-29")  # when each first came up
     business.edit(s, patches["id"], "sec", owner="amy", due="2026-11-01")
     business.close(s, park["id"], "sec", "2026-11-05")
     new = business.add(s, "Order a new feedline", "sec", opened="2026-11-05")
