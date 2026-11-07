@@ -11,7 +11,7 @@
     "Old Business": "Carried forward from last meeting (its Old and New Business). Delete what's finished, update the rest.",
     "Upcoming Events": "Carried forward from last meeting. Delete past events, add new ones.",
     "Winners": "e.g. “50/50 drawing – Jim F $7.50” and “Weekly drawing – Dave G, not registered (up to $62)”.",
-    "Upcoming Chow": "Leave it empty to show “See the attached chow list”.",
+    "Upcoming Chow": "This section comes from the chow schedule and is updated when you submit. To change who brings chow, use the Chow page.",
   };
   const RECENT_GUESTS = 8; // quick-pick buttons; older guests are in the name field's autocomplete
   // A guest on their Nth visit or later gets a reminder to invite them to apply for membership.
@@ -89,13 +89,14 @@
   window.addEventListener("beforeunload", (e) => { if (saved.classList.contains("dirty")) e.preventDefault(); });
 
   // ---------- steps ----------
+  const STEP_LABEL = { "Upcoming Chow": "Chow" };  // the minutes' section keeps its full name
   function go(i) { S.step = Math.max(0, Math.min(STEPS.length - 1, i)); render(); save(); window.scrollTo(0, 0); }
   document.getElementById("prev").onclick = () => go(S.step - 1);
   document.getElementById("next").onclick = () => go(S.step + 1);
 
   function render() {
     const nav = document.getElementById("steps");
-    nav.replaceChildren(...STEPS.map((s, i) => h("button", { class: i === S.step ? "on" : "", onclick: () => go(i) }, `${i + 1}. ${s}`)));
+    nav.replaceChildren(...STEPS.map((s, i) => h("button", { class: i === S.step ? "on" : "", onclick: () => go(i) }, `${i + 1}. ${STEP_LABEL[s] || s}`)));
     const step = STEPS[S.step];
     panel.replaceChildren(
       step === "Attendance" ? attendance() :
@@ -231,13 +232,53 @@
     return wrap;
   }
   function listSection(sec) {
+    if (sec === "Upcoming Chow") return chowSection();
     const arr = (M.sections[sec] || []).map((i) => i.text);
     const set = (a) => { M.sections[sec] = a.map((t) => ({ text: t, member: null })); };
     const rows = itemRows(arr, set);
     const motion = sec === "New Business" || sec === "Old Business" ? h("button", { class: "btn small ghost", onclick: () => {
       arr.push("Motion: ___ moved to ___, seconded by ___. Passed."); set(arr); render(); save(); } }, "+ Motion") : null;
-    const hint = [HINTS[sec], sec === "Upcoming Chow" ? null : EMPTY_NOTE].filter(Boolean).join(" ");
+    const hint = [HINTS[sec], EMPTY_NOTE].filter(Boolean).join(" ");
     return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, hint), rows, motion);
+  }
+
+  // ---------- chow: did tonight's member bring it? The rest is read-only, from the chow schedule. ----------
+  function chowSection() {
+    const C = D.chow;
+    const box = h("div", { class: "chowbox" }), list = h("ul", { class: "chowlist" });
+    const showList = () => {
+      M.sections["Upcoming Chow"] = C.section.map((t) => ({ text: t, member: null }));
+      list.replaceChildren(...(C.section.length ? C.section.map((t) => h("li", {}, t)) : [h("li", { class: "muted" }, "Nothing scheduled.")]));
+    };
+    const post = async (data) => {
+      const r = await fetch("/chow/record", { method: "POST", headers: { Accept: "application/json" },
+        body: new URLSearchParams({ date: C.date, note: "", ...data }) });
+      const j = await r.json();
+      if (!r.ok) { alert(j.error || "Couldn't save"); return; }
+      Object.assign(C, { covered_by: null, note: "" }, data, { section: j.section }); draw(); showList(); save();
+    };
+    const draw = () => {
+      if (!C.member) { box.replaceChildren(h("b", {}, "Chow tonight: "), C.status === "none" ? "no chow tonight." : "nobody was scheduled."); return; }
+      const what = h("input", { placeholder: "What they brought (optional)", value: C.note || "", size: 26 });
+      const cover = h("select", {}, h("option", { value: "" }, "Who brought it?"),
+        D.members.filter((m) => m.id !== C.member).map((m) => h("option", { value: m.id, selected: m.id === C.covered_by }, m.name)));
+      const done = { provided: "✓ provided", missed: "✗ not provided", covered: "brought by someone else" }[C.status];
+      box.replaceChildren(
+        h("div", {}, h("b", {}, "Chow tonight: "), C.name, done ? h("span", { class: "badge" }, " " + done) : null,
+          C.status === "covered" && C.covered_by ? ` (${people[C.covered_by]?.name || C.covered_by})` : "",
+          C.note ? `: ${C.note}` : ""),
+        h("div", { class: "row" }, what,
+          h("button", { class: "btn small", onclick: () => post({ status: "provided", note: what.value }) }, "Provided"),
+          h("button", { class: "btn small ghost", onclick: () => { if (confirm(`Record that ${C.name} did not provide chow? (Bylaws VII.F: $35 added to dues.)`)) post({ status: "missed" }); } }, "Not provided"),
+          C.status && C.status !== "scheduled" ? h("button", { class: "btn small ghost", title: "Clear", onclick: () => post({ status: "scheduled" }) }, "Undo") : null),
+        h("details", { class: "edit" }, h("summary", {}, "Someone else brought it"),
+          h("div", { class: "row" }, cover,
+            h("button", { class: "btn small ghost", onclick: () => { if (!cover.value) return alert("Pick who brought it."); post({ status: "covered", covered_by: cover.value, note: what.value }); } }, "Save"))));
+    };
+    draw(); showList();
+    return h("div", {}, h("h2", {}, "Chow"), box,
+      h("p", { class: "hint" }, HINTS["Upcoming Chow"], " ", h("a", { href: "/chow", target: "_blank" }, "Open the Chow page")),
+      h("h3", {}, "In the minutes (Upcoming Chow)"), list);
   }
 
   // ---------- review & submit ----------

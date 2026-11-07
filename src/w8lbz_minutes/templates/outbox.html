@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}Preview outbox{% endblock %}{% block body %}
+<h1>Preview outbox</h1>
+<p class="muted">Emails this preview would have sent, newest first. None of them left this machine. "Withheld" shows who email test mode (<code>email.only_to</code>) would skip on the live site.</p>
+{% for e in mail %}<article class="mail">
+  <div class="muted small">{{ e.at|ts }}{% if e.reply_to %} · Reply-To {{ e.reply_to }}{% endif %}{% if e.attachments %} · attached: {{ e.attachments|join(', ') }}{% endif %}</div>
+  <h3>{{ e.subject }}</h3>
+  <div><b>To:</b> {{ e.to|join(', ') or '(nobody)' }}{% if e.withheld %} <span class="muted">· withheld: {{ e.withheld|length }}</span>{% endif %}</div>
+  <pre>{{ e.body }}</pre>
+</article>{% else %}<p class="muted">Nothing yet.</p>{% endfor %}
+{% endblock %}

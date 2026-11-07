@@ -23,7 +23,7 @@ from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
 from webauthn.helpers.structs import (AuthenticatorSelectionCriteria, PublicKeyCredentialDescriptor,
                                       ResidentKeyRequirement, UserVerificationRequirement)
 
-from .club import DATA, Club
+from .club import DATA, PREVIEW, Club
 
 log = logging.getLogger("w8lbz.auth")
 
@@ -84,13 +84,18 @@ class Auth:
         cols = {r["name"] for r in self.db.execute("pragma table_info(passkeys)")}
         if "aaguid" not in cols:  # added after the first release
             self.db.execute("alter table passkeys add column aaguid text")
+        session_cols = {r["name"] for r in self.db.execute("pragma table_info(sessions)")}
+        if "admin_until" not in session_cols:
+            self.db.execute("alter table sessions add column admin_until integer")
+        if "view_as" not in session_cols:
+            self.db.execute("alter table sessions add column view_as text")
         os.chmod(path, 0o600)
 
     # ---------------- sessions ----------------
     def new_session(self, member: str, agent: str = "") -> str:
         token = secrets.token_urlsafe(32)
         now = int(time.time())
-        self.db.execute("insert into sessions values (?,?,?,?,?)",
+        self.db.execute("insert into sessions (token_hash, member, created, expires, agent) values (?,?,?,?,?)",
                         (_hash(token), member, now, now + self.session_days * 86400, agent[:200]))
         return token
 
@@ -106,6 +111,35 @@ class Auth:
     def is_active(self, member: str) -> bool:
         m = self.club.members.get(self.club.canonical(member))
         return bool(m and m.status.lower() not in ("inactive", "silent key"))
+
+    # ---------------- admin mode (per sign-in, time-limited) ----------------
+    def admin_until(self, token: str | None) -> int | None:
+        """When this sign-in's admin mode ends, or None if it's off."""
+        if not token:
+            return None
+        row = self.db.execute("select member, admin_until from sessions where token_hash=?", (_hash(token),)).fetchone()
+        if not row or not row["admin_until"] or row["admin_until"] < time.time() or not self.club.is_admin(row["member"]):
+            return None
+        return row["admin_until"]
+
+    def set_admin(self, token: str, minutes: int) -> int | None:
+        """Turn admin mode on for `minutes` (0 turns it off). Only for members listed as admins."""
+        row = self.db.execute("select member from sessions where token_hash=?", (_hash(token),)).fetchone()
+        if not row or not self.club.is_admin(row["member"]):
+            return None
+        until = int(time.time()) + minutes * 60 if minutes else None
+        self.db.execute("update sessions set admin_until=?, view_as=null where token_hash=?", (until, _hash(token)))
+        return until
+
+    def view_as(self, token: str | None) -> str | None:
+        """The member an admin is viewing the app as (read-only), only while admin mode is on."""
+        if not self.admin_until(token):
+            return None
+        row = self.db.execute("select view_as from sessions where token_hash=?", (_hash(token),)).fetchone()
+        return row["view_as"] if row else None
+
+    def set_view_as(self, token: str, member: str | None) -> None:
+        self.db.execute("update sessions set view_as=? where token_hash=?", (member, _hash(token)))
 
     def end_session(self, token: str | None) -> None:
         if token:
@@ -239,11 +273,29 @@ class Auth:
                                                user_verification=UserVerificationRequirement.PREFERRED)
         return self._challenge("login", opts.challenge), options_to_json(opts)
 
-    def authenticate(self, cid: str | None, credential: dict) -> str:
-        ch = self._take_challenge(cid, "login")
-        if not ch:
+    def step_up_options(self, member: str) -> tuple[str, str]:
+        """Ask the signed-in member to confirm with one of their own passkeys (before admin mode)."""
+        allow = [PublicKeyCredentialDescriptor(id=base64url_to_bytes(r["id"]))
+                 for r in self.db.execute("select id from passkeys where member=?", (member,))]
+        opts = generate_authentication_options(rp_id=self.rp_id, allow_credentials=allow,
+                                               user_verification=UserVerificationRequirement.REQUIRED)
+        return self._challenge("step-up", opts.challenge, member), options_to_json(opts)
+
+    def step_up_link(self, member: str) -> str:
+        """For an admin without a passkey here: a one-time code, emailed, that only works for them."""
+        return self._challenge("step-up-email", b"", member)
+
+    def use_step_up_link(self, cid: str, member: str) -> bool:
+        ch = self._take_challenge(cid, "step-up-email")
+        return bool(ch and ch["member"] == member)
+
+    def authenticate(self, cid: str | None, credential: dict, kind: str = "login", member: str | None = None) -> str:
+        ch = self._take_challenge(cid, kind)
+        if not ch or (member and ch["member"] != member):
             raise ValueError("Sign-in expired; please try again.")
         row = self.db.execute("select * from passkeys where id=?", (credential.get("id"),)).fetchone()
+        if member and row and row["member"] != member:
+            raise ValueError("That passkey belongs to someone else.")
         if not row:
             raise ValueError("That passkey isn't registered here. Sign in by email, then add it on your account page.")
         v = verify_authentication_response(credential=credential, expected_challenge=ch["challenge"],
@@ -270,6 +322,18 @@ def _safe_next(url: str) -> str:
     return url if url.startswith("/") and not url.startswith("//") else "/"
 
 
+def _preview_outbox(recipients, subject, body, attachments, only_to, reply_to) -> int:
+    """Preview mode: record the email (and who test mode would withhold it from) instead of sending."""
+    allowed = [r for r in recipients if only_to is None or r.strip().lower() in only_to]
+    entry = {"at": int(time.time()), "to": allowed, "withheld": [r for r in recipients if r not in allowed],
+             "subject": subject, "body": body, "reply_to": reply_to, "attachments": [a[0] for a in attachments]}
+    p = DATA / "preview-outbox.jsonl"
+    with p.open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+    log.info("preview: email %r recorded in the outbox, not sent", subject)
+    return len(allowed)
+
+
 def send_email(to: str | list[str], subject: str, body: str, attachments: list[tuple[str, bytes, str]] = (),
                only_to: set[str] | None = None, reply_to: str | None = None) -> int:
     """Send through SMTP (Gmail by default) using W8LBZ_SMTP_* environment variables.
@@ -279,6 +343,8 @@ def send_email(to: str | list[str], subject: str, body: str, attachments: list[t
     credentials, messages are logged instead. Returns how many messages were sent.
     """
     recipients = [to] if isinstance(to, str) else list(to)
+    if PREVIEW:
+        return _preview_outbox(recipients, subject, body, attachments, only_to, reply_to)
     if only_to is not None:
         allowed = [r for r in recipients if r.strip().lower() in only_to]
         if len(allowed) < len(recipients):

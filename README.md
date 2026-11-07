@@ -63,12 +63,25 @@ Members edit their own email, phone, address, birthday and sharing choices at `/
 - Each change is logged in `profile-changes.jsonl` in the data directory, emailed to members whose title includes Secretary, and can be undone by any officer at `/roster/changes`.
 - Officers see all contact details; other members see only what each member shares.
 
+## Admin mode
+Callsigns listed under `admins:` in `club.yaml` get **Turn on admin mode** in the name menu. For an hour (or until turned off) that sign-in can see and do what officers can, with a red banner showing. Each switch is logged in `admin-log.jsonl` in the data directory.
+
+In admin mode, a member's page has **View the app as …**: the app as that member sees it, read-only (no changes, and not their sign-in or passkey page), until **Stop** or admin mode ends. Also logged.
+
 ## Bylaws
 `/bylaws` shows the club's constitution and bylaws from `bylaws.md` in the data directory (`/var/lib/w8lbz-minutes/bylaws.md` on the server). It's kept out of this public repo.
 
+## Previewing a branch
+`deploy/preview.sh BRANCH` runs a branch on the dev box (192.168.23.101, ports from 8100) so it can be tried before merging, with no change to CT103. It prints the address and a one-time sign-in link (passkeys don't work on a bare IP address).
+- **Preview mode:** a banner on every page; email is recorded on the **outbox** page (`/preview/outbox`) instead of being sent; roster edits go to a local copy of the sheet.
+- Each preview has its own checkout and a fresh copy of `data/` (meetings, roster cache, bylaws) on every update; its sign-ins are kept.
+- `deploy/preview.sh --list` shows running previews; `deploy/preview.sh --stop BRANCH` stops one and deletes its copy.
+- They run as user services (`systemctl --user`), so they stop if this user logs out entirely, unless lingering is enabled (`loginctl enable-linger`).
+
 ## Changes and releases
 - Each PR adds a line under "Unreleased" in `CHANGELOG.md`, and removes its item from `ROADMAP.md` if it finishes one.
-- To release: rename "Unreleased" to the new version and date, bump `version` in `pyproject.toml` (then `uv lock`), merge, and tag the merge commit (`git tag v0.3.0 && git push origin v0.3.0`). Deploy with `update.sh`; the footer then shows the new version.
+- To release: in a PR, rename "Unreleased" to the new version and date and bump `version` in `pyproject.toml` (then `uv lock`). When it merges, the Release workflow tags the merge commit `vX.Y.Z` and publishes a GitHub release with that CHANGELOG section. Deploy with `update.sh`; the footer then shows the new version.
+- Every pull request runs the tests (the Tests workflow).
 
 ## License
 Copyright © 2026 Jim Flattery, KO4CGQ.
@@ -76,3 +89,8 @@ Copyright © 2026 Jim Flattery, KO4CGQ.
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See [LICENSE](LICENSE).
 
 If you run a modified version for others over a network, you must offer them its source code (AGPL section 13). The About page's source link does this for the club's copy.
+
+## Chow schedule
+`/chow` is the chow list; the app is the source of truth (state in `chow.json`, every change in `chow-log.jsonl`, both in the data directory).
+- One-time import of the Secretary's spreadsheet: `w8lbz-minutes chow-import FILE.xlsx --order "Surname,Surname,..." --next Surname` prints what it found, including anything to check; add `--write` to save it (it won't overwrite an existing schedule).
+- Members ask each other to swap; leaders edit directly; the console records provided, missed or covered on meeting night.

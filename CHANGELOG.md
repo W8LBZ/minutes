@@ -4,7 +4,17 @@ What changed in each version of W8LBZ Minutes. Planned work is in [ROADMAP.md](R
 
 Versions follow [semantic versioning](https://semver.org): while the app is 0.x, the middle number goes up for new features and the last for fixes. Each version is a git tag (`v0.2.0`), and the app's footer shows the version that's running.
 
-## Unreleased
+## 0.4.0 (2026-11-06)
+- **Sign-in & passkeys** is now a tab of Your profile, which tidies the menu under your name.
+- **Add a member** from the Roster page (Secretary or Treasurer). It writes a new row on the roster sheet and a "Joined" row on its Membership Log (values only), and the member shows up at once, at the end of the current chow round. Guests who've come often enough to be invited are listed, and picking one fills in their name and callsign. A callsign and license class are required. The Secretary gets an email, and Recent changes shows who added them.
+- **Shorter lists:** the archive, the Stats page's Per meeting table and the Roster show a page at a time, with a "Show 10 / 25 / 50 / All" choice. The archive is one list, newest first, with year headings. The archive and Stats share a Period choice: this year (the default), the last 6 or 12 months, any year, or all time. The Roster shows Active members by default; pick another status or Everyone.
+- **Chow schedule** (top menu → Chow), replacing the Secretary's spreadsheet. Officers get three tabs: Schedule, Rotation, and Past nights & changes.
+  - Everyone sees who brings chow each night. A member can **ask another to swap nights**; the other member approves or declines, and both (and the Secretary) get an email.
+  - Officers can assign nights, swap them, mark no-chow nights (holidays), and **fill the schedule** from the rotation. The rotation keeps the same order each round, new members join at the end of the current round, and limits like "can't do 3rd Thursdays" or "away in February" are respected: that member keeps their turn and gets the next night they can do.
+  - On meeting night the console's Upcoming Chow step records whether chow was **provided or not**, and optionally what was brought (or that someone else brought it). Nights without chow are listed for the Treasurer (bylaws VII.F).
+  - The minutes' Upcoming Chow section is no longer typed in: on Submit it's written from the schedule (tonight's chow, changes made tonight, and the next four nights).
+  - `w8lbz-minutes chow-import` brings in the Secretary's .xlsx once.
+- **Members are told when their details change:** an email listing what changed and who changed it, sent to both the old and new address after an email change.
 - **Your profile:** members update their own email, phone, address and birthday (month and day only), and choose which of these other members can see. Changes go straight to the roster sheet (values only), the Secretary gets an email, and officers can undo any change from **Recent changes**. A new email takes effect only after it's confirmed from the new address.
 - **Fixed:** a roster sync (nightly, or `w8lbz-minutes roster`) now shows up right away; before, the app kept the old roster until it was restarted.
 - **Contact details on member pages:** click a name on the Roster for their details. Officers see everyone's (with unshared ones marked); members see what each person chose to share, and all of their own.

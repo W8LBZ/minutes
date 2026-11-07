@@ -19,7 +19,7 @@ import os
 import re
 from pathlib import Path
 
-from .club import ROOT, ROSTER_CACHE as CACHE
+from .club import DATA, PREVIEW, ROOT, ROSTER_CACHE as CACHE
 
 KEY_FILE = Path(os.environ.get("W8LBZ_GOOGLE_KEY", ROOT / "private" / "google-service-account.json"))
 
@@ -64,6 +64,8 @@ class Sheet:
     """Values-only read/write of the roster tab, for members' profile edits."""
 
     def __init__(self, session=None):
+        if session is None and PREVIEW:
+            session = PreviewSheet()
         if session is None:
             import google.auth.transport.requests as gr
             from google.oauth2 import service_account
@@ -71,20 +73,20 @@ class Sheet:
                 KEY_FILE, scopes=["https://www.googleapis.com/auth/spreadsheets"])
             session = gr.AuthorizedSession(creds)
         self.s = session
-        self.sid, self.tab = _sheet()
+        self.sid, self.tab = ("preview", "Member Roster") if PREVIEW else _sheet()
 
     def _url(self, rng: str = "") -> str:
         return f"https://sheets.googleapis.com/v4/spreadsheets/{self.sid}/values{rng}"
 
-    def read(self) -> list[list[str]]:
-        r = self.s.get(self._url(f"/'{self.tab}'"), params={"valueRenderOption": "UNFORMATTED_VALUE"})
+    def read(self, tab: str | None = None) -> list[list[str]]:
+        r = self.s.get(self._url(f"/'{tab or self.tab}'"), params={"valueRenderOption": "UNFORMATTED_VALUE"})
         r.raise_for_status()
         return [[str(x) for x in row] for row in r.json().get("values", [])]
 
-    def write(self, cells: dict[str, str]) -> None:
+    def write(self, cells: dict[str, str], tab: str | None = None) -> None:
         """cells: A1 address (e.g. D5) -> value. RAW, so nothing typed is ever parsed as a formula."""
         body = {"valueInputOption": "RAW",
-                "data": [{"range": f"'{self.tab}'!{a1}", "values": [[v]]} for a1, v in cells.items()]}
+                "data": [{"range": f"'{tab or self.tab}'!{a1}", "values": [[v]]} for a1, v in cells.items()]}
         r = self.s.post(self._url(":batchUpdate"), json=body)
         if r.status_code == 403:
             raise SheetError("The app can't write to the roster sheet yet (it needs Editor access).")
@@ -107,6 +109,69 @@ class Sheet:
         old = {f: row[header.index(f)] for f in changes}
         self.write({f"{_col(header.index(f))}{rows[0]}": v for f, v in changes.items() if old[f] != v})
         return old
+
+
+    def add_row(self, values: dict[str, str], tab: str | None = None, optional: tuple[str, ...] = ()) -> int:
+        """Write a new row (header name -> value) under the last row that has a full_name. Values only:
+        rows are never inserted, so the sheet's formatting, dropdowns and structure are left alone.
+        (Going by full_name, not "any cell", skips rows that only hold empty checkboxes or dropdowns.)"""
+        grid = self.read(tab)
+        header = [h.strip().lower() for h in grid[0]] if grid else []
+        values = {f: v for f, v in values.items() if f in header or f not in optional}
+        missing = [f for f in values if f not in header]
+        if missing or "full_name" not in header:
+            raise SheetError(f"The {tab or self.tab} tab has no {', '.join(missing or ['full_name'])} column.")
+        key = header.index("full_name")
+        row = max((i for i, r in enumerate(grid, start=1) if i > 1 and len(r) > key and str(r[key]).strip()),
+                  default=1) + 1
+        self.write({f"{_col(header.index(f))}{row}": v for f, v in values.items() if v}, tab)
+        return row
+
+
+class PreviewSheet:
+    """Preview mode's stand-in for the Sheets API: local grids (preview-sheet.json, one per tab) built from
+    the roster cache, so roster edits can be tried without touching the real sheet."""
+    HEADER = ["callsign", "full_name", "email", "Phone", "Address", "Class", "Title(s)", "Status", "birthday", "share"]
+    LOG_HEADER = ["callsign", "full_name", "date", "event", "note"]
+
+    def __init__(self):
+        self.path = DATA / "preview-sheet.json"
+        if not self.path.exists():
+            people = json.loads(CACHE.read_text()) if CACHE.exists() else []
+            rows = [[p.get("callsign") or "", f"{p['first']} {p['last']}", p.get("email") or "", p.get("phone") or "",
+                     p.get("address") or "", p.get("license_class") or "", p.get("role") or "",
+                     p.get("status") or "Active", p.get("birthday") or "", ", ".join(p.get("share") or [])]
+                    for p in people]
+            self.path.write_text(json.dumps({"Member Roster": [self.HEADER] + rows, "Membership Log": [self.LOG_HEADER]}))
+
+    class _Response:
+        def __init__(self, data=None):
+            self.data, self.status_code = data or {}, 200
+
+        def json(self):
+            return self.data
+
+        def raise_for_status(self):
+            pass
+
+    def get(self, url, params=None):
+        tab = url.rsplit("/", 1)[1].strip("'")
+        return self._Response({"values": json.loads(self.path.read_text()).get(tab, [])})
+
+    def post(self, url, json=None):
+        import json as j
+        tabs = j.loads(self.path.read_text())
+        for d in json["data"]:
+            tab, a1 = d["range"].split("!")
+            grid = tabs.setdefault(tab.strip("'"), [])
+            col_letters = re.match(r"[A-Z]+", a1).group()
+            col = sum((ord(ch) - 64) * 26 ** i for i, ch in enumerate(reversed(col_letters))) - 1
+            row = int(a1[len(col_letters):]) - 1
+            grid += [[] for _ in range(row + 1 - len(grid))]
+            grid[row] += [""] * (col + 1 - len(grid[row]))
+            grid[row][col] = d["values"][0][0]
+        self.path.write_text(j.dumps(tabs))
+        return self._Response()
 
 
 def fetch_rows(tab: str | None = None) -> list[dict[str, str]]:

@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block title %}Your profile{% endblock %}{% block body %}
 <h1>Your profile</h1>
+{% include "_profile_tabs.html" %}
 <p class="muted">{{ m.name }}{% if m.callsign %} · {{ m.callsign }}{% endif %}{% if m.license_class %} · {{ m.license_class }}{% endif %}.
 Your name, callsign and license class are kept by the Secretary; ask an officer to change them.</p>
 {% if saved and not error %}<p class="msg ok">Saved. The club roster is updated.</p>{% endif %}

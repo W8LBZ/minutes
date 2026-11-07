@@ -36,8 +36,6 @@ button.btn { border: 0; cursor: pointer; font: inherit; } .btn.small { padding: 
 .rename { display: flex; gap: .4rem; align-items: center; } .rename .pkname { min-width: 8rem; } .rename input { font: inherit; padding: .2rem .4rem; border: 1px solid #ccd; border-radius: .3rem; min-width: 10rem; }
 .headrow { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
 .filter select { font: inherit; padding: .2rem .4rem; }
-details.year { margin: .5rem 0 1rem; } details.year > summary { cursor: pointer; font-size: 1.2rem; font-weight: 600; padding: .3rem 0; }
-details.year > summary .muted { font-size: .9rem; font-weight: normal; }
 .pager { display: flex; gap: .75rem; align-items: center; }
 .linkgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 1rem; margin: 1rem 0; }
 .linkcard { display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: 1.2rem .8rem; text-align: center;
@@ -64,3 +62,25 @@ svg.lock { width: .85em; height: .85em; vertical-align: -.05em; fill: #8a8f80; s
 div.change { white-space: pre-line; }
 .contactcard { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.2rem; } .contactcard dt { color: #667; }
 .contactcard dd { margin: 0; } .contactcard dd.address { white-space: pre-line; }
+.preview { background: #fff3c4; border-bottom: 1px solid #e0c96a; padding: .4rem 1rem; font-size: .9rem; text-align: center; }
+article.mail { border: 1px solid #d9dccf; border-radius: .4rem; padding: .6rem .9rem; margin: .8rem 0; background: #fff; }
+article.mail h3 { margin: .2rem 0; } article.mail pre { white-space: pre-wrap; font: inherit; font-size: .9rem; margin: .5rem 0 0; }
+.adminbar { background: #8b1d1d; color: #fff; padding: .4rem 1rem; font-size: .9rem; text-align: center; }
+.adminbar form { display: inline; margin-left: .6rem; } .adminbar button { font: inherit; font-size: .85rem; padding: .1rem .6rem; border-radius: .3rem; border: 1px solid #fff; background: transparent; color: #fff; cursor: pointer; }
+table.chow tr.mine td { background: #eef2e6; } table.chow tr.none td { color: #889; } table.chow td { vertical-align: middle; }
+table.chow td.chowact { text-align: right; } table.chow td.chowact details.edit[open] { text-align: left; }
+form.inline { display: inline-flex; gap: .3rem; align-items: center; margin: .15rem .2rem; flex-wrap: wrap; } form.inline select, form.inline input { font: inherit; padding: .15rem; }
+details.edit { display: inline-block; text-align: left; } details.edit > summary { cursor: pointer; color: #556; font-size: .85rem; }
+details.edit[open] { display: block; background: #f6f8f1; border: 1px solid #d9dccf; border-radius: .4rem; padding: .4rem .6rem; margin: .3rem 0; }
+.swapreq form { display: inline; margin-left: .4rem; } .missed { color: #9b1c1c; }
+ol.rotation, ul.rotation { padding-left: 0; list-style: none; } .rotation .n { display: inline-block; width: 1.8rem; color: #889; } ol.rotation li, ul.rotation li { padding: .2rem 0; border-bottom: 1px solid #eee; }
+ol.rotation li, ul.rotation li { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .8rem; }
+ol.rotation .who, ul.rotation .who { min-width: 11rem; } ol.rotation .ops { margin-left: auto; display: flex; align-items: center; gap: .2rem; }
+ol.rotation li > details.edit[open], ol.rotation .ops details.edit[open] { flex-basis: 100%; }
+.adminbar.viewas { background: #4b2a7a; }
+nav.tabs { display: flex; gap: .3rem; border-bottom: 1px solid #d9dccf; margin: .2rem 0 1rem; flex-wrap: wrap; }
+nav.tabs a { padding: .35rem .8rem; border: 1px solid transparent; border-bottom: none; border-radius: .4rem .4rem 0 0; text-decoration: none; color: inherit; }
+nav.tabs a.on { border-color: #d9dccf; background: #fff; margin-bottom: -1px; font-weight: 600; }
+ul.chowlist { margin: .3rem 0 1rem; }
+tr.yearrow th { text-align: left; padding-top: .9rem; font-size: 1.05rem; border-bottom: 2px solid #d9dccf; }
+form.profile input:not([type]), form.profile input[type=date] { display: block; padding: .4rem .5rem; font: inherit; font-weight: normal; margin-top: .2rem; }

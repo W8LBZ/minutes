@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Turn on admin mode{% endblock %}{% block body %}
+<h1>Turn on admin mode</h1>
+<p class="muted">Admin mode lets you see and change what officers can, and view the app as another member, for an hour. First, confirm it's really you.</p>
+{% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+{% if sent %}<p class="msg ok">We emailed a link to <b>{{ email }}</b>. Open it in this browser within 5 minutes.</p>{% endif %}
+{% if passkey %}
+<p><button class="btn" id="confirm">Confirm with your passkey</button> <span id="pkmsg" class="muted"></span></p>
+<script src="/static/auth.js"></script>
+<script>
+document.getElementById("confirm").onclick = async () => {
+  const msg = document.getElementById("pkmsg"); msg.textContent = "";
+  try {
+    const o = await post("/admin/confirm/options");
+    o.challenge = b64u.toBuf(o.challenge);
+    (o.allowCredentials || []).forEach((c) => (c.id = b64u.toBuf(c.id)));
+    const cred = await navigator.credentials.get({ publicKey: o });
+    const r = await post("/admin/confirm/verify", { credential: credToJSON(cred), next: {{ next|tojson }} });
+    location.href = r.next;
+  } catch (e) { msg.textContent = e.message || "Couldn't confirm."; }
+};
+</script>
+<p class="muted small">No passkey with you?</p>
+{% endif %}
+<form method="post" action="/admin/confirm/email"><input type="hidden" name="next" value="{{ next }}">
+  <button class="btn{{ ' ghost small' if passkey }}">{{ 'Email me a link instead' if passkey else 'Email me a confirmation link' }}</button></form>
+<p><a href="{{ next }}">Cancel</a></p>
+{% endblock %}

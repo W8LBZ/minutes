@@ -17,7 +17,7 @@ from .club import DATA, ROSTER_CACHE, Club
 from .roster import EDITABLE, Sheet
 
 log = logging.getLogger("w8lbz.profile")
-LABELS = {"email": "Email", "phone": "Phone", "address": "Address", "birthday": "Birthday", "share": "Shared with members"}
+LABELS = {"callsign": "Callsign", "license_class": "License class", "joined": "Joined", "email": "Email", "phone": "Phone", "address": "Address", "birthday": "Birthday", "share": "Shared with members"}
 
 
 def log_path():
@@ -45,6 +45,12 @@ def _append(entry: dict) -> None:
     with p.open("a") as f:
         f.write(json.dumps(entry) + "\n")
     os.chmod(p, 0o600)
+
+
+def log_added(mid: str, by: str, fields: dict) -> None:
+    """A new member added from the Roster page; shown in Recent changes (it can't be undone from there)."""
+    _append({"id": secrets.token_hex(6), "at": int(time.time()), "member": mid, "by": by,
+             "added": True, "old": {}, "new": fields})
 
 
 def _apply_locally(club: Club, mid: str, new: dict[str, str]) -> None:
@@ -87,7 +93,7 @@ def change(club: Club, mid: str, new: dict[str, str], by: str, sheet: Sheet | No
 def undo(club: Club, change_id: str, by: str, sheet: Sheet | None = None, url: str = "") -> dict:
     """Put back the old values of a change, unless the member has changed those fields again since."""
     e = next((x for x in history(10_000) if x["id"] == change_id), None)
-    if not e or e["undone"] or e.get("undoes"):
+    if not e or e["undone"] or e.get("undoes") or e.get("added"):
         raise ValueError("That change can't be undone.")
     m = club.members[e["member"]]
     if any(as_cell(f, getattr(m, f)) != v for f, v in e["new"].items()):
@@ -96,18 +102,32 @@ def undo(club: Club, change_id: str, by: str, sheet: Sheet | None = None, url: s
 
 
 def _notify(club: Club, e: dict, url: str) -> None:
-    to = [club.members[s].email for s in club.secretaries if s != e["by"] and club.members[s].email]
-    if not to:
-        return
+    """Tell the Secretary, and the member whose details changed (old and new addresses, if the email changed)."""
     who, by = club.name(e["member"]), club.name(e["by"])
+
     def show(v):
         return (v or "(blank)").replace("\n", " / ")
     what = "\n".join(f"  {LABELS[f]}: {show(e['old'].get(f))}  ->  {show(v)}" for f, v in e["new"].items())
     action = f"{by} undid an earlier change to {who}'s roster details" if e.get("undoes") else (
         f"{who} updated their roster details" if e["by"] == e["member"] else f"{by} updated {who}'s roster details")
-    body = (f"{action}. The roster sheet has been updated.\n\n{what}\n\n"
-            f"If this looks wrong, any officer can undo it here: {url}/roster/changes\n\n73,\nW8LBZ Minutes")
+    secretaries = [club.members[s].email for s in club.secretaries if s != e["by"] and club.members[s].email]
+    _send(club, secretaries, f"Roster update: {who}",
+          f"{action}. The roster sheet has been updated.\n\n{what}\n\n"
+          f"If this looks wrong, any officer can undo it here: {url}/roster/changes\n\n73,\nW8LBZ Minutes", e)
+
+    m = club.members[e["member"]]
+    member_to = [a for a in dict.fromkeys([m.email, e["old"].get("email")]) if a]  # both, after an email change
+    you = "You" if e["by"] == e["member"] else by
+    _send(club, member_to, "Your W8LBZ roster details were updated",
+          f"Hi {m.first},\n\n{you} updated your details on the club roster:\n\n{what}\n\n"
+          f"You can see and change them on your profile: {url}/profile\n"
+          f"If you didn't expect this, reply to this email or tell an officer.\n\n73,\nW8LBZ Minutes", e)
+
+
+def _send(club: Club, to: list[str], subject: str, body: str, e: dict) -> None:
+    if not to:
+        return
     try:
-        auth.send_email(to, f"Roster update: {who}", body, only_to=club.email_only_to())
+        auth.send_email(to, subject, body, only_to=club.email_only_to())
     except Exception:
-        log.exception("couldn't email the Secretary about change %s", e["id"])
+        log.exception("couldn't send %r about change %s", subject, e["id"])

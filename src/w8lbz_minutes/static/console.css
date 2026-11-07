@@ -34,3 +34,5 @@ textarea { resize: vertical; min-height: 2.4rem; }
 .invitebox { background: #f7e7c0; border-left: 4px solid #d9a520; border-radius: .4rem; padding: .6rem .8rem; margin: .5rem 0; font-weight: 600; color: #5a3d00; }
 .share { font: inherit; font-size: .85rem; margin-left: .4rem; padding: .15rem .65rem; border-radius: 1rem; border: 1px solid #2f3d1c; background: #eef2e6; color: #2f3d1c; cursor: pointer; }
 .share:hover { background: #dfe7d2; } .share.ok { background: #2f3d1c; color: #fff; } .small { font-size: .85rem; }
+.chowbox { border: 1px solid #d9dccf; border-radius: .5rem; background: #f6f8f1; padding: .6rem .8rem; margin: .4rem 0 .8rem; }
+.chowbox .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: .4rem 0; } .chowbox select, .chowbox input { font: inherit; padding: .2rem; }

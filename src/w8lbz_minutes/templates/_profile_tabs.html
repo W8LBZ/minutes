@@ -1,0 +1,1 @@
+<nav class="tabs">{% for href, label in (('/profile', 'Your details'), ('/account', 'Sign-in & passkeys')) %}<a href="{{ href }}" class="{{ 'on' if request.url.path == href }}">{{ label }}</a>{% endfor %}</nav>

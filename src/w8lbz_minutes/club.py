@@ -18,6 +18,9 @@ ROOT = Path(os.environ.get("W8LBZ_ROOT", Path(__file__).resolve().parents[2]))
 DATA = Path(os.environ.get("W8LBZ_DATA", ROOT / "data"))
 MEETINGS = DATA / "meetings"
 ROSTER_CACHE = DATA / "roster.json"
+# Preview mode (deploy/preview.sh): set to the branch name. Email goes to an outbox file instead of
+# SMTP, and roster edits go to a local copy of the sheet, never the real one.
+PREVIEW = os.environ.get("W8LBZ_PREVIEW") or None
 
 
 CALLSIGN = re.compile(r"^[A-Z]{1,2}\d[A-Z]{1,3}$", re.I)
@@ -63,6 +66,9 @@ class Club:
         self.auth = cfg.get("auth") or {}
         self.email = cfg.get("email") or {}
         self.redact = [_n(x) for x in (cfg.get("privacy") or {}).get("never_record", [])]
+        self.admins = {str(x).lower() for x in cfg.get("admins") or []}  # may turn on admin mode (callsign ids)
+        # Offices whose holders add new members to the roster (bylaws IV.C: the Secretary keeps it).
+        self.roster_keepers = [str(x).lower() for x in cfg.get("roster_keepers") or ["Secretary", "Treasurer"]]
 
         self._mtime = None  # set when the people come from the roster cache, so refresh() can notice a sync
         if roster is None and "members" in cfg:  # inline members (tests, example config)
@@ -131,10 +137,18 @@ class Club:
 
     can_edit = can_lead
 
-    def can_see(self, viewer: str | None, mid: str, fld: str) -> bool:
-        """Contact details: officers and the member always; other members only what was shared."""
+    def is_admin(self, mid: str | None) -> bool:
+        """Listed under admins: in club.yaml. Admin rights apply only while admin mode is on."""
+        return bool(mid) and mid in self.admins
+
+    def can_see(self, viewer: str | None, mid: str, fld: str, elevated: bool = False) -> bool:
+        """Contact details: officers, admins in admin mode, and the member always; others only what was shared."""
         v, m = self.members.get(viewer or ""), self.members.get(mid)
-        return bool(m and v and (v.officer or v.id == m.id or fld in m.share))
+        return bool(m and v and (v.officer or elevated or v.id == m.id or fld in m.share))
+
+    def keeps_roster(self, mid: str | None) -> bool:
+        m = self.members.get(mid or "")
+        return bool(m and m.role and any(k in m.role.lower() for k in self.roster_keepers))
 
     @property
     def secretaries(self) -> list[str]:

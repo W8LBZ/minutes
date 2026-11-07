@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import logging
 import re
+import threading
 from importlib.metadata import metadata, requires, version
 from pathlib import Path
 from urllib.parse import quote
@@ -15,9 +16,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import console, profile
+from . import chow, console, membership, profile
+from . import auth as authmod
 from .auth import Auth, _safe_next
-from .club import DATA
+from .club import DATA, PREVIEW
 from .roster import SHAREABLE, SheetError
 from .meeting import SECTIONS
 from .store import Archive
@@ -58,6 +60,7 @@ templates.env.filters["linkify"] = linkify
 templates.env.filters["longdate"] = lambda d: d.strftime(DATES["document"])
 templates.env.filters["listdate"] = lambda d: d.strftime(DATES["list"])
 templates.env.filters["by_last_name"] = by_last_name
+templates.env.filters["clock"] = lambda t: dt.datetime.fromtimestamp(t).strftime("%-I:%M %p")
 def monthday(md: str | None) -> str:
     """'07-04' -> 'July 4'. Anything else (e.g. a full date typed into the sheet) is shown as is."""
     try:
@@ -68,7 +71,7 @@ def monthday(md: str | None) -> str:
 
 templates.env.filters["monthday"] = monthday
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
-templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"))
+templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"), PREVIEW=PREVIEW)
 
 
 # ---------------- login gate ----------------
@@ -76,8 +79,21 @@ templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=versi
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     archive.club.refresh()  # pick up a roster sync without a restart
-    request.state.member = authn.member_for(request.cookies.get(COOKIE))
+    token = request.cookies.get(COOKIE)
+    real = authn.member_for(token)
+    request.state.real_member = real
+    request.state.admin_until = authn.admin_until(token) if real else None
+    # "View as": an admin in admin mode sees the app exactly as another member does, read-only.
+    va = authn.view_as(token) if request.state.admin_until else None
+    request.state.viewing_as = va if va in archive.club.members and va != real else None
+    request.state.member = request.state.viewing_as or real
     path = request.url.path
+    if request.state.viewing_as:
+        request.state.admin_until = None  # their permissions, not the admin's
+        if path.startswith(("/account", "/profile/email", "/logout", "/auth/")) or (
+                request.method not in ("GET", "HEAD") and not path.startswith("/admin/")):
+            return HTMLResponse("You're viewing the app as another member, which is read-only. "
+                                "Stop viewing as them (banner at the top) to make changes.", status_code=403)
     if request.state.member or path.startswith(PUBLIC_PATHS):
         return await call_next(request)
     if request.method == "GET" and not path.startswith("/api/"):
@@ -90,24 +106,41 @@ def me(request: Request) -> str:
     return request.state.member
 
 
+def real_me(request: Request) -> str:
+    """The signed-in member, even while viewing the app as someone else."""
+    return request.state.real_member
+
+
+def admin_mode(request: Request) -> bool:
+    return bool(getattr(request.state, "admin_until", None))
+
+
+def privileged(request: Request) -> bool:
+    """Officers, and admins while admin mode is on: see all contact details, the change log, undo."""
+    m = archive.club.members.get(getattr(request.state, "member", None) or "")
+    return bool(m and (m.officer or admin_mode(request)))
+
+
 def leader(request: Request) -> str:
-    if not archive.club.can_lead(request.state.member):
+    if not (archive.club.can_lead(request.state.member) or admin_mode(request)):
         raise HTTPException(403, "Only officers and minutes editors can lead a meeting.")
     return request.state.member
 
 
 def officer(request: Request) -> str:
-    m = archive.club.members.get(request.state.member)
-    if not (m and m.officer):
+    if not privileged(request):
         raise HTTPException(403, "Only officers can do that.")
-    return m.id
+    return request.state.member
 
 
 def page(request: Request, name: str, **ctx) -> HTMLResponse:
     mid = getattr(request.state, "member", None)
     return templates.TemplateResponse(request, name, {
+        "club": archive.club,
         "me": archive.club.members.get(mid) if mid else None,
-        "can_lead": archive.club.can_lead(mid) if mid else False,
+        "can_lead": (archive.club.can_lead(mid) or admin_mode(request)) if mid else False,
+        "is_admin": archive.club.is_admin(mid), "admin_until": getattr(request.state, "admin_until", None),
+        "viewing_as": getattr(request.state, "viewing_as", None),
         "rp_id": authn.rp_id, **ctx})
 
 
@@ -177,6 +210,239 @@ def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depe
                 welcome=welcome, next=_safe_next(next), passkey_host=request.url.hostname == authn.rp_id)
 
 
+# ---------------- chow list ----------------
+_chow_lock = threading.Lock()
+
+
+def can_edit_chow(request: Request) -> bool:
+    """Changing the schedule: officers (it's the Secretary's job day to day) and admins in admin mode.
+    Minutes editors see the member view; they record chow on meeting night from the console."""
+    return privileged(request)
+
+
+def chow_change(request: Request, fn, back: str = "/chow"):
+    """Run fn(state) under the lock and save. ValueError -> shown on the Chow page."""
+    with _chow_lock:
+        s = chow.load()
+        try:
+            res = fn(s)
+        except ValueError as e:
+            if request.headers.get("accept", "").startswith("application/json"):
+                return JSONResponse({"error": str(e)}, status_code=409)
+            return RedirectResponse(f"{back}{'&' if '?' in back else '?'}error=" + quote(str(e)), status_code=303)
+        chow.save(s)
+    if request.headers.get("accept", "").startswith("application/json"):
+        return JSONResponse({"ok": True, **(res if isinstance(res, dict) else {})})
+    return RedirectResponse(back, status_code=303)
+
+
+def chow_leader(request: Request) -> str:
+    if not can_edit_chow(request):
+        raise HTTPException(403, "Only leaders can change the chow schedule.")
+    return request.state.member
+
+
+@app.get("/chow", response_class=HTMLResponse)
+@app.get("/chow/{tab}", response_class=HTMLResponse)
+def chow_page(request: Request, tab: str = "schedule", error: str = "", mid: str = Depends(me)):
+    s, club = chow.load(), archive.club
+    leader = can_edit_chow(request)
+    if tab not in ("schedule", "rotation", "history") or (tab != "schedule" and not leader):
+        raise HTTPException(404)
+    members = sorted((m for m in club.members.values() if m.status.lower() not in ("inactive", "silent key")),
+                     key=lambda m: (m.last, m.first))
+    today = dt.date.today()
+    return page(request, "chow.html", s=s, error=error, leader=leader, tab=tab, members=members,
+                upcoming=chow.upcoming(s, n=16), past=chow.past(s, n=16) if leader else [],
+                mine=[d for d, x in chow.upcoming(s, n=60) if x.get("member") == mid and x.get("status") != "none"],
+                asked=[r for r in s["swaps"] if r["status"] == "pending" and mid in (r["with"], r["requester"])],
+                next_up=chow.next_up(club, s), today=today.isoformat(),
+                default_until=(today + dt.timedelta(days=180)).isoformat(),
+                log=chow.history(30) if leader else [], fmt=lambda d: dt.date.fromisoformat(d).strftime("%a %b %-d"))
+
+
+@app.post("/chow/request")
+def chow_request(request: Request, mine: str = Form(...), theirs: str = Form(...), mid: str = Depends(me)):
+    return chow_change(request, lambda s: chow.request_swap(archive.club, s, mid, mine, theirs, base_url(request)))
+
+
+@app.post("/chow/requests/{rid}/answer")
+def chow_answer(request: Request, rid: str, approve: int = Form(0), mid: str = Depends(me)):
+    return chow_change(request, lambda s: chow.decide_swap(archive.club, s, rid, mid, bool(approve), base_url(request)))
+
+
+@app.post("/chow/assign")
+def chow_assign(request: Request, date: str = Form(...), member: str = Form(""), mid: str = Depends(chow_leader)):
+    dt.date.fromisoformat(date)
+    return chow_change(request, lambda s: chow.assign(archive.club, s, date, member or None, mid, base_url(request)))
+
+
+@app.post("/chow/none")
+def chow_none(request: Request, date: str = Form(...), note: str = Form(""), mid: str = Depends(chow_leader)):
+    dt.date.fromisoformat(date)
+    return chow_change(request, lambda s: chow.set_none(s, date, note, mid))
+
+
+@app.post("/chow/swap")
+def chow_swap(request: Request, a: str = Form(...), b: str = Form(...), mid: str = Depends(chow_leader)):
+    return chow_change(request, lambda s: chow.swap(archive.club, s, a, b, mid, base_url(request)))
+
+
+@app.post("/chow/record")
+def chow_record(request: Request, date: str = Form(...), status: str = Form(...), covered_by: str = Form(""),
+                note: str = Form(""), next: str = Form("/chow/history"), mid: str = Depends(leader)):
+    def run(s):
+        chow.record(archive.club, s, date, status, mid, covered_by or None, note)
+        return {"section": chow.minutes_section(archive.club, s, chow.history(), date)}  # for the console
+    return chow_change(request, run, back=_safe_next(next))
+
+
+@app.post("/chow/generate")
+def chow_generate(request: Request, until: str = Form(...), next_member: str = Form(""), mid: str = Depends(chow_leader)):
+    def run(s):
+        if next_member:
+            s["next"] = next_member
+        if not chow.generate(archive.club, s, dt.date.fromisoformat(until), mid):
+            raise ValueError("No open meeting nights to fill before that date.")
+    return chow_change(request, run, back="/chow/rotation")
+
+
+@app.post("/chow/order")
+def chow_order(request: Request, member: str = Form(...), op: str = Form(...), mid: str = Depends(chow_leader)):
+    """Rotation order: move a member up or down, add a waiting member at the bottom, or take one out."""
+    def run(s):
+        order = list(s["order"])
+        if op == "add" and member in archive.club.members and member not in order:
+            order.append(member)
+        elif op == "remove" and member in order:
+            order.remove(member)
+            s["pending"].append(member)
+        elif op in ("up", "down") and member in order:
+            i = order.index(member)
+            j = i - 1 if op == "up" else i + 1
+            if 0 <= j < len(order):
+                order[i], order[j] = order[j], order[i]
+        chow.set_order(s, order, mid)
+    return chow_change(request, run, back="/chow/rotation")
+
+
+@app.post("/chow/constraints")
+async def chow_constraints(request: Request, mid: str = Depends(chow_leader)):
+    form = await request.form()
+    who = form.get("member", "")
+    if who not in archive.club.members:
+        raise HTTPException(404)
+    weeks = [int(w) for w in form.getlist("not_weeks") if w.isdigit()]
+    away = [[form.get("away_from", ""), form.get("away_to", "")]] if form.get("away_from") else []
+    return chow_change(request, lambda s: chow.set_constraints(s, who, weeks, away, form.get("note", ""), mid),
+                       back="/chow/rotation")
+
+
+# ---------------- admin mode ----------------
+ADMIN_MINUTES = 60
+
+
+def _admin_log(request: Request, **entry) -> None:
+    entry = {"at": int(dt.datetime.now().timestamp()), "member": request.state.real_member,
+             "ip": request.client.host if request.client else None, **entry}
+    p = DATA / "admin-log.jsonl"
+    with p.open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+    p.chmod(0o600)
+
+
+def _admin(mid: str) -> str:
+    if not archive.club.is_admin(mid):
+        raise HTTPException(403, "You aren't listed as an admin.")
+    return mid
+
+
+def _admin_on(request: Request, mid: str, how: str) -> None:
+    until = authn.set_admin(request.cookies.get(COOKIE), ADMIN_MINUTES)
+    _admin_log(request, on=True, until=until, confirmed_by=how)
+    _log.info("admin mode on for %s (confirmed by %s)", mid, how)
+
+
+@app.post("/admin/mode")
+def admin_mode_switch(request: Request, on: int = Form(0), next: str = Form("/"), mid: str = Depends(real_me)):
+    """Admins turn admin mode off at once; turning it on first asks them to confirm it's really them."""
+    _admin(mid)
+    if on:
+        return RedirectResponse("/admin/confirm?next=" + quote(_safe_next(next)), status_code=303)
+    until = authn.set_admin(request.cookies.get(COOKIE), 0)
+    _admin_log(request, on=False, until=until)
+    _log.info("admin mode off for %s", mid)
+    return RedirectResponse(_safe_next(next), status_code=303)
+
+
+@app.get("/admin/confirm", response_class=HTMLResponse)
+def admin_confirm(request: Request, next: str = "/", sent: int = 0, error: str = "", mid: str = Depends(real_me)):
+    """Step-up check before admin mode: a passkey where we can, else a one-time link emailed to the admin."""
+    _admin(mid)
+    passkey = request.url.hostname == authn.rp_id and bool(authn.passkeys(mid))
+    return page(request, "admin_confirm.html", next=_safe_next(next), passkey=passkey, sent=sent, error=error,
+                email=archive.club.members[mid].email)
+
+
+@app.post("/admin/confirm/options")
+def admin_confirm_options(mid: str = Depends(real_me)):
+    _admin(mid)
+    cid, options = authn.step_up_options(mid)
+    response = Response(options, media_type="application/json")
+    response.set_cookie(CHALLENGE_COOKIE, cid, max_age=300, httponly=True, samesite="strict", secure=True)
+    return response
+
+
+@app.post("/admin/confirm/verify")
+async def admin_confirm_verify(request: Request, mid: str = Depends(real_me)):
+    _admin(mid)
+    body = await request.json()
+    try:
+        authn.authenticate(request.cookies.get(CHALLENGE_COOKIE), body["credential"], kind="step-up", member=mid)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    _admin_on(request, mid, "passkey")
+    return {"ok": True, "next": _safe_next(body.get("next", "/"))}
+
+
+@app.post("/admin/confirm/email")
+def admin_confirm_email(request: Request, next: str = Form("/"), mid: str = Depends(real_me)):
+    _admin(mid)
+    m = archive.club.members[mid]
+    if not m.email:
+        raise HTTPException(400, "There's no email address for you on the roster.")
+    url = f"{base_url(request)}/admin/confirm/link?t={authn.step_up_link(mid)}&next={quote(_safe_next(next))}"
+    # Only ever to the admin themself, so test mode (email.only_to) doesn't apply.
+    authmod.send_email(m.email, "Turn on admin mode", f"Hi {m.first},\n\nSomeone signed in as you asked to turn on admin mode "
+               f"in W8LBZ Minutes. If that was you, open this link in the same browser within 5 minutes:\n\n{url}\n\n"
+               f"If it wasn't you, don't open it, and sign out your other sessions on your profile page.\n\n73,\nW8LBZ")
+    _admin_log(request, step_up_email=True)
+    return RedirectResponse("/admin/confirm?sent=1&next=" + quote(_safe_next(next)), status_code=303)
+
+
+@app.get("/admin/confirm/link")
+def admin_confirm_link(request: Request, t: str = "", next: str = "/", mid: str = Depends(real_me)):
+    _admin(mid)
+    if not authn.use_step_up_link(t, mid):
+        return RedirectResponse("/admin/confirm?error=" + quote("That link has expired or was already used.")
+                                + "&next=" + quote(_safe_next(next)), status_code=303)
+    _admin_on(request, mid, "email")
+    return RedirectResponse(_safe_next(next), status_code=303)
+
+
+@app.post("/admin/view-as")
+def admin_view_as(request: Request, member: str = Form(""), next: str = Form("/"), mid: str = Depends(real_me)):
+    """Start (member=id) or stop (member empty) viewing the app as another member. Admin mode only; logged."""
+    if not authn.admin_until(request.cookies.get(COOKIE)):
+        raise HTTPException(403, "Turn on admin mode first.")
+    if member and (member not in archive.club.members or member == mid):
+        raise HTTPException(404)
+    authn.set_view_as(request.cookies.get(COOKIE), member or None)
+    _admin_log(request, view_as=member or None)
+    _log.info("%s %s", mid, f"viewing as {member}" if member else "stopped viewing as another member")
+    return RedirectResponse(_safe_next(next), status_code=303)
+
+
 # ---------------- profile (own contact details and sharing) ----------------
 
 def clean_address(text: str) -> str:
@@ -228,6 +494,36 @@ def profile_email_confirm(request: Request, t: str = "", mid: str = Depends(me))
     except SheetError as e:
         return RedirectResponse("/profile?error=" + quote(str(e)), status_code=303)
     return RedirectResponse("/profile?saved=1", status_code=303)
+
+
+def roster_keeper(request: Request) -> str:
+    """Adding members: the offices in roster_keepers (Secretary and Treasurer by default), or admin mode."""
+    if not (archive.club.keeps_roster(request.state.member) or admin_mode(request)):
+        raise HTTPException(403, "Only the Secretary or Treasurer can add members.")
+    return request.state.member
+
+
+@app.get("/roster/add", response_class=HTMLResponse)
+def roster_add_form(request: Request, guest: str = "", error: str = "", mid: str = Depends(roster_keeper)):
+    ready = membership.ready_guests(archive.guests(), int(archive.club.info.get("invite_after_visits", 3)))
+    g = next((x for x in ready if x["name"] == guest), None)
+    first, last = membership.split_name(g["name"]) if g else ("", "")
+    f = {"first": first, "last": last, "callsign": (g or {}).get("callsign") or ""}
+    return page(request, "roster_add.html", ready=ready, guest=g, f=f, error=error, classes=membership.CLASSES,
+                today=dt.date.today().isoformat(), invite_after=archive.club.info.get("invite_after_visits", 3))
+
+
+@app.post("/roster/add", response_class=HTMLResponse)
+async def roster_add(request: Request, mid: str = Depends(roster_keeper)):
+    form = dict(await request.form())
+    try:
+        new = membership.add_member(archive.club, form, mid, url=base_url(request))
+    except (ValueError, SheetError) as e:
+        ready = membership.ready_guests(archive.guests(), int(archive.club.info.get("invite_after_visits", 3)))
+        return page(request, "roster_add.html", ready=ready, guest=None, f=form, error=str(e),
+                    classes=membership.CLASSES, today=dt.date.today().isoformat(),
+                    invite_after=archive.club.info.get("invite_after_visits", 3))
+    return RedirectResponse(f"/members/{new}?added=1", status_code=303)
 
 
 @app.get("/roster/changes", response_class=HTMLResponse)
@@ -302,32 +598,43 @@ async def passkey_login_verify(request: Request):
 
 # ---------------- archive ----------------
 
-PER_PAGE = 26  # meetings per archive page: about half a year
+PER_OPTIONS = (10, 25, 50, 0)  # list page sizes; 0 = all
+
+
+def paginate(items: list, p: str, per: str, default: int = 25) -> dict:
+    """One page of a long list. p and per come from the query string as text (junk falls back to defaults)."""
+    n = int(per) if per.isdigit() and int(per) in PER_OPTIONS else default
+    size = n or max(len(items), 1)
+    pages = max(1, -(-len(items) // size))
+    p = min(max(int(p) if p.isdigit() else 1, 1), pages)
+    rows = items[(p - 1) * size:p * size]
+    return {"rows": rows, "p": p, "pages": pages, "per": n, "options": PER_OPTIONS, "total": len(items),
+            "first": (p - 1) * size + 1 if rows else 0, "last": (p - 1) * size + len(rows)}
 
 
 def years() -> list[int]:
-    return sorted({m.date.year for m in archive.meetings}, reverse=True)
+    """Years with minutes, and always this year (the default period, even before its first meeting)."""
+    return sorted({m.date.year for m in archive.meetings} | {dt.date.today().year}, reverse=True)
+
+
+def by_period(period: str) -> tuple[list, str, str]:
+    """Meetings for a period choice: this year (default), 6m, 12m, all, or a year. -> (meetings, period, label)."""
+    today = dt.date.today()
+    if period in ("6m", "12m"):
+        cutoff = today - dt.timedelta(days=182 if period == "6m" else 365)
+        label = "in the last 6 months" if period == "6m" else "in the last 12 months"
+        return [m for m in archive.meetings if m.date > cutoff], period, label
+    if period == "all":
+        return list(archive.meetings), "all", "on record"
+    year = int(period) if period.isdigit() else today.year
+    return [m for m in archive.meetings if m.date.year == year], str(year), f"in {year}"
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, year: str = "", p: str = Query("1", alias="page")):
-    """Meetings grouped by year, newest first. With ?year=, that year alone, PER_PAGE at a time."""
-    # The "All years" option sends year= (empty); anything that isn't a number means all years.
-    year = int(year) if year.isdigit() else None
-    p = int(p) if p.isdigit() else 1
-    if year:
-        ms = [m for m in archive.meetings if m.date.year == year]
-        pages = max(1, -(-len(ms) // PER_PAGE))
-        p = min(max(p, 1), pages)
-        groups = [(year, ms[(p - 1) * PER_PAGE:p * PER_PAGE], len(ms))]
-    else:
-        pages = 1
-        groups = [(y, ms[:PER_PAGE], len(ms))
-                  for y in years() for ms in [[m for m in archive.meetings if m.date.year == y]]]
-    this_year = dt.date.today().year
-    open_year = year or (this_year if this_year in years() else next(iter(years()), None))
-    return page(request, "index.html", groups=groups, years=years(), year=year, open_year=open_year,
-                p=p, pages=pages)
+def index(request: Request, period: str = "", p: str = Query("1", alias="page"), per: str = ""):
+    """Meetings newest first, a page at a time, for a period (this year by default)."""
+    ms, period, label = by_period(period)
+    return page(request, "index.html", pg=paginate(ms, p, per), years=years(), period=period, label=label)
 
 
 @app.get("/meetings/{slug}", response_class=HTMLResponse)
@@ -382,13 +689,15 @@ def member(request: Request, mid: str):
     values = {"email": (m.email, f"mailto:{m.email}"), "phone": (m.phone, f"tel:{m.phone}"),
               "address": (m.address, None), "birthday": (monthday(m.birthday), None)}
     # (field, value, link), with the value blank unless this viewer may see it (club.can_see)
-    contact = [(f, v if v and club.can_see(viewer, mid, f) else None, href) for f, (v, href) in values.items()]
+    elevated = admin_mode(request)
+    contact = [(f, v if v and club.can_see(viewer, mid, f, elevated) else None, href) for f, (v, href) in values.items()]
     return page(request, "member.html", member=m, h=archive.member_history(mid), total=len(archive.meetings),
-                contact=contact, is_me=viewer == mid, is_officer=club.members[viewer].officer)
+                contact=contact, is_me=viewer == mid, is_officer=privileged(request),
+                can_view_as=elevated and mid != request.state.real_member)
 
 
 @app.get("/roster", response_class=HTMLResponse)
-def roster(request: Request):
+def roster(request: Request, status: str = "Active", p: str = Query("1", alias="page"), per: str = ""):
     """Everyone on the roster; contact details are on each member's own page."""
     def since(m):
         try:
@@ -397,9 +706,12 @@ def roster(request: Request):
             return None
     gone = ("inactive", "silent key")
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
-    return page(request, "roster.html", rows=[(m, since(m)) for m in ms],
-                active=sum(m.status.lower() not in gone for m in ms),
-                is_officer=archive.club.members[request.state.member].officer)
+    statuses = sorted({m.status for m in ms}, key=lambda x: (x != "Active", x))
+    shown = [m for m in ms if status == "all" or m.status == status]
+    return page(request, "roster.html", pg=paginate([(m, since(m)) for m in shown], p, per, 50),
+                active=sum(m.status.lower() not in gone for m in ms), statuses=statuses, status=status,
+                is_officer=privileged(request),
+                can_add=archive.club.keeps_roster(request.state.member) or admin_mode(request))
 
 
 @app.get("/bylaws", response_class=HTMLResponse)
@@ -468,22 +780,28 @@ def about(request: Request):
     return page(request, "about.html", deps=dependencies(), changelog=changelog, license=_license("w8lbz-minutes"))
 
 
+@app.get("/preview/outbox", response_class=HTMLResponse)
+def preview_outbox(request: Request):
+    """Preview mode only: the emails the app would have sent."""
+    p = DATA / "preview-outbox.jsonl"
+    if not PREVIEW or not archive.club.is_admin(request.state.real_member):
+        raise HTTPException(404)
+    mail = [json.loads(line) for line in p.read_text().splitlines()][::-1] if p.exists() else []
+    return page(request, "outbox.html", mail=mail)
+
+
 @app.get("/links", response_class=HTMLResponse)
 def links(request: Request):
     return page(request, "links.html")
 
 
 @app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, period: str = "12m"):
-    """Attendance for the last 12 months (default), all time, or one year."""
-    if period == "all":
-        ms, label = archive.meetings, "on record"
-    elif period.isdigit():
-        ms, label = [m for m in archive.meetings if m.date.year == int(period)], f"in {period}"
-    else:
-        period, cutoff = "12m", dt.date.today() - dt.timedelta(days=365)
-        ms, label = [m for m in archive.meetings if m.date > cutoff], "in the last 12 months"
-    return page(request, "stats.html", s=archive.stats(ms), period=period, label=label, years=years())
+def stats(request: Request, period: str = "", p: str = Query("1", alias="page"), per: str = ""):
+    """Attendance for a period: this year (default), the last 6 or 12 months, all time, or one year."""
+    ms, period, label = by_period(period)
+    st = archive.stats(ms)
+    return page(request, "stats.html", s=st, pg=paginate(st["rows"], p, per, 10),
+                period=period, label=label, years=years())
 
 
 @app.get("/guests", response_class=HTMLResponse)
