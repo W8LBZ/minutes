@@ -76,7 +76,7 @@
       <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="remove"><button class="btn small ghost" onclick="return confirm('Take {{ club.name(mid) }} out of the rotation?')">Take out of rotation</button></form>
     </details></span>
 </li>{% endfor %}</ol>
-{% if s.pending %}<h3>Not in the rotation yet</h3>
+{% if s.pending %}<h3>Taken out of the rotation</h3>
 <ul class="rotation">{% for mid in s.pending if mid in club.members %}<li><span class="who">{{ club.name(mid) }}</span>
   <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="add"><button class="btn small ghost">Add at the bottom</button></form></li>{% endfor %}</ul>{% endif %}
 

@@ -50,7 +50,7 @@ def test_add_member_writes_rows_and_updates_the_app(env):
     assert len(roster_rows) == 1 + len(PEOPLE) + 1
     assert log_rows[1] == ["KD8NEW", "Ann New", "2026-11-05", "Joined", "Added in the app by Tom Till"]
     assert json.loads((tmp / "roster.json").read_text())[-1]["member_since"] == "2026-11-05"
-    assert chow.load()["pending"] == ["kd8new"]                  # waits to be added to the chow rotation
+    assert chow.load()["order"] == ["kd8new"]                    # at the bottom of the chow rotation
     assert sent == [(["jane@example.org"], "New member: Ann New")]  # the Secretary is told
     with pytest.raises(ValueError):
         membership.add_member(club, {"first": "Ann", "last": "Again", "callsign": "KD8NEW", "license_class": "General"},

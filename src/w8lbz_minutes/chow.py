@@ -334,8 +334,14 @@ def import_xlsx(club: Club, path: Path, order: list[str], by: str, year: int) ->
         else:
             problems.append(f"Rotation: no member matches {n!r}")
     s["order"] = list(dict.fromkeys(s["order"]))
-    active = [m.id for m in club.members.values() if m.status.lower() not in ("inactive", "silent key")]
-    s["pending"] = [m for m in active if m not in s["order"]]
+    # Active members missing from the spreadsheet go to the bottom of the rotation, as new members do.
+    active = sorted((m for m in club.members.values() if m.status.lower() not in ("inactive", "silent key")),
+                    key=lambda m: (m.last, m.first))
+    missing = [m.id for m in active if m.id not in s["order"]]
+    if missing:
+        problems.append("Not on the spreadsheet, added at the bottom of the rotation: "
+                        + ", ".join(club.name(m) for m in missing))
+    s["order"] += missing
     return s, problems
 
 

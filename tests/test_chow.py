@@ -144,7 +144,7 @@ def test_import_matches_misspelled_names_and_fixes_dates(env, tmp_path):
     assert {d: x["member"] for d, x in s["nights"].items()} == {
         "2026-11-05": "amy", "2026-11-12": "bob", "2026-11-26": None, "2026-12-03": "cal"}
     assert s["nights"]["2026-11-26"] == {"member": None, "status": "none", "note": "Thanksgiving"}
-    assert s["order"] == ["amy", "bob", "cal", "dee"] and s["pending"] == ["sec"]
+    assert s["order"] == ["amy", "bob", "cal", "dee", "sec"] and s["pending"] == []  # Sam wasn't listed: at the bottom
     assert any("Nov 25" in p for p in problems) and any("Nobody" in p for p in problems)
 
 

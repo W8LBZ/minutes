@@ -87,10 +87,10 @@ def add_member(club: Club, form: dict, by: str, sheet: Sheet | None = None, url:
     tmp.replace(ROSTER_CACHE)
     club._load(rows)
 
-    # New members wait under "Not in the rotation yet" on the Chow page until a leader adds them.
+    # New members go to the bottom of the chow rotation (an officer can move or remove them).
     s = chow.load()
-    if mid not in s["order"] + s["pending"]:
-        s["pending"].append(mid)
+    if mid not in s["order"]:
+        chow.set_order(s, s["order"] + [mid], by)
         chow.save(s)
 
     # Who added them: in Recent changes (here), the Membership Log note (sheet) and the Secretary's email.
