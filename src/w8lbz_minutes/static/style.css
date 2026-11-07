@@ -101,7 +101,7 @@ section.suggestions { border: 1px solid #c9c2e6; background: #f6f4fc; border-rad
 .itemacts { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; align-items: center; } .itemacts form { margin: 0; display: inline; }
 button.act { font: inherit; font-size: .88rem; padding: .25rem .8rem; border: 1px solid #d3d7c8; border-radius: 1rem; background: #fff; color: #2f3b1f; cursor: pointer; }
 button.act:hover { background: #eef2e6; } button.act.on { background: #2f3b1f; color: #fff; border-color: #2f3b1f; }
-.panel { margin-top: .7rem; padding-top: .7rem; border-top: 1px solid #eceee6; }
+.panel { margin-top: .7rem; padding: .7rem 0 .5rem; border-top: 1px solid #eceee6; border-bottom: 1px solid #eceee6; }
 .timeline { list-style: none; padding: 0; margin: 0; max-height: 22rem; overflow-y: auto; }
 .timeline li { padding: .5rem .75rem; border-radius: .5rem; margin: .15rem 0; }
 .timeline li:nth-child(odd) { background: #f4f6ef; } .timeline li:nth-child(even) { background: #fff; }

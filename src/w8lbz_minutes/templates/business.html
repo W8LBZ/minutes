@@ -33,17 +33,6 @@
     {% if x.quiet %}<span class="chip warn" title="Nothing has changed on it for weeks">quiet for a while: still on?</span>{% endif %}
     <span class="chip">📅 since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a></span>
   </div>
-  {% if cs %}<div class="comments">
-    {% if cs|length > 2 %}<button type="button" class="linkbtn more" data-more="m{{ x.id }}">Show all {{ cs|length }} comments</button>{% endif %}
-    {% for c in cs %}<div class="comment"{% if loop.revindex > 2 %} data-group="m{{ x.id }}" hidden{% endif %}>
-      <span class="chip">👤 <a href="/members/{{ c.by }}">{{ club.short(c.by) }}</a></span> <span class="muted small">{{ c.at|tsfull }}</span>
-      {% if leader or c.by == me.id %}<form method="post" action="/business/{{ x.id }}/comments/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')"><button class="linkbtn" title="Delete this comment">Delete</button></form>{% endif %}
-      <div class="ctext">{{ c.text }}</div></div>{% endfor %}
-  </div>{% endif %}
-  <div class="itemacts"><button type="button" class="act" data-panel="c{{ x.id }}">💬 Comment</button></div>
-  <div class="panel" id="c{{ x.id }}" hidden>
-    <form method="post" action="/business/{{ x.id }}/comment" class="modern"><textarea name="text" rows="4" required placeholder="Write an update, a question, or an offer to help…"></textarea>
-      <div class="formrow"><button class="btn small">Add comment</button> <button type="button" class="btn small ghost" data-close>Cancel</button></div></form></div>
   {% if mine %}<div class="panel" id="e{{ x.id }}" hidden>
     <form method="post" action="/business/{{ x.id }}/edit" class="modern">
       <label>Item<textarea name="text" rows="3" required>{{ x.text }}</textarea>
@@ -56,6 +45,17 @@
       {% if leader %}<p class="hint">Hold keeps it out of Old Business until that night (e.g. the President's State of the Club).</p>{% endif %}
       <div class="formrow"><button class="btn small">Save</button> <button type="button" class="btn small ghost" data-close>Cancel</button></div></form></div>{% endif %}
   <div class="panel" id="h{{ x.id }}" hidden>{{ timeline(x) }}</div>
+  {% if cs %}<div class="comments">
+    {% if cs|length > 2 %}<button type="button" class="linkbtn more" data-more="m{{ x.id }}">Show all {{ cs|length }} comments</button>{% endif %}
+    {% for c in cs %}<div class="comment"{% if loop.revindex > 2 %} data-group="m{{ x.id }}" hidden{% endif %}>
+      <span class="chip">👤 <a href="/members/{{ c.by }}">{{ club.short(c.by) }}</a></span> <span class="muted small">{{ c.at|tsfull }}</span>
+      {% if leader or c.by == me.id %}<form method="post" action="/business/{{ x.id }}/comments/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')"><button class="linkbtn" title="Delete this comment">Delete</button></form>{% endif %}
+      <div class="ctext">{{ c.text }}</div></div>{% endfor %}
+  </div>{% endif %}
+  <div class="itemacts"><button type="button" class="act" data-panel="c{{ x.id }}">💬 Comment</button></div>
+  <div class="panel" id="c{{ x.id }}" hidden>
+    <form method="post" action="/business/{{ x.id }}/comment" class="modern"><textarea name="text" rows="4" required placeholder="Write an update, a question, or an offer to help…"></textarea>
+      <div class="formrow"><button class="btn small">Add comment</button> <button type="button" class="btn small ghost" data-close>Cancel</button></div></form></div>
 </article>{% else %}<p class="muted">Nothing open.</p>{% endfor %}</div>
 
 {% elif tab == 'add' %}
