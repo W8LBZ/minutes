@@ -39,8 +39,8 @@ The app runs as the `minutes` user on port 8000. The roster syncs daily at 04:00
 Members sign in with a passkey, or with a one-time link emailed to their roster address.
 - **Passkeys** only work at the HTTPS address in `club.yaml` (`auth.rp_id`).
 - **Email** needs `W8LBZ_SMTP_USER` / `W8LBZ_SMTP_PASSWORD` (a Gmail app password) in `/etc/w8lbz-minutes/env`.
-- **AI** (optional) needs `W8LBZ_OPENROUTER_KEY` in `/etc/w8lbz-minutes/env` and `ai: {model: ...}` in club.yaml. Each call is logged to `ai-log.jsonl` in the data folder (time, model, size, cost; never the text).
   Without them, links are written to the server log instead.
+- **AI** (optional) needs `W8LBZ_OPENROUTER_KEY` in `/etc/w8lbz-minutes/env` and `ai: {model: ...}` in club.yaml. Each call is logged to `ai-log.jsonl` in the data folder (time, model, size, cost; never the text).
 - **Recovery:** an admin on the server can print a one-time link for a member: `w8lbz-minutes login-link KO4CGQ`
 
 Only officers and members ticked `minutes_editor` in the roster can use the leader console.
