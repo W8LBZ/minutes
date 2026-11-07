@@ -8,6 +8,8 @@ Versions follow [semantic versioning](https://semver.org): while the app is 0.x,
 - **Light and dark themes:** the app follows your device, or pick Auto, Light or Dark under your name. Printed minutes stay black on white.
 - **A more modern look:** striped, rounded tables (archive, roster, stats, guests), a top bar that shows where you are, and tidier buttons, fields, tabs and sign-in page.
 - **Profile pictures:** add one on Your profile; it shows next to your name in the menu, on the roster, on your member page and on business items and comments. Members only; camera details and location are removed. Without one, your initials are shown.
+- **Roster card view:** switch the Roster between the list and cards with pictures, using the two buttons next to the filters. Your choice is remembered.
+- **Your profile** shows your name, callsign and license class as read-only fields, with a note that the Secretary keeps them.
 
 ## 0.6.0 (2026-11-07)
 - **Chow pages are easier to read:** the schedule, past nights and rotation are tidy striped lists with date blocks, your own night highlighted, chips for what happened and for each member's limits, and buttons that open a small panel right under the row. Names are picked by typing, as on the Business page.
