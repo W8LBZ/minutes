@@ -5,9 +5,9 @@ What changed in each version of W8LBZ Minutes. Planned work is in [ROADMAP.md](R
 Versions follow [semantic versioning](https://semver.org): while the app is 0.x, the middle number goes up for new features and the last for fixes. Each version is a git tag (`v0.2.0`), and the app's footer shows the version that's running.
 
 ## Unreleased
-- **Chow schedule** (top menu → Chow), replacing the Secretary's spreadsheet. Leaders get three tabs: Schedule, Rotation, and Past nights & changes.
+- **Chow schedule** (top menu → Chow), replacing the Secretary's spreadsheet. Officers get three tabs: Schedule, Rotation, and Past nights & changes.
   - Everyone sees who brings chow each night. A member can **ask another to swap nights**; the other member approves or declines, and both (and the Secretary) get an email.
-  - Leaders can assign nights, swap them, mark no-chow nights (holidays), and **fill the schedule** from the rotation. The rotation keeps the same order each round, new members go at the bottom, and limits like "can't do 3rd Thursdays" or "away in February" are respected: that member keeps their turn and gets the next night they can do.
+  - Officers can assign nights, swap them, mark no-chow nights (holidays), and **fill the schedule** from the rotation. The rotation keeps the same order each round, new members go at the bottom, and limits like "can't do 3rd Thursdays" or "away in February" are respected: that member keeps their turn and gets the next night they can do.
   - On meeting night the console's Upcoming Chow step records whether chow was **provided or not**, and optionally what was brought (or that someone else brought it). Nights without chow are listed for the Treasurer (bylaws VII.F).
   - The minutes' Upcoming Chow section is no longer typed in: on Submit it's written from the schedule (tonight's chow, changes made tonight, and the next four nights).
   - `w8lbz-minutes chow-import` brings in the Secretary's .xlsx once.

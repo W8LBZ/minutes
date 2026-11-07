@@ -1,8 +1,8 @@
 {% extends "base.html" %}{% block title %}Chow{% endblock %}{% block body %}
 <h1>Chow schedule</h1>
 {% if leader %}<nav class="tabs">{% for t, label in (('schedule', 'Schedule'), ('rotation', 'Rotation'), ('history', 'Past nights & changes')) %}<a href="/chow{{ '' if t == 'schedule' else '/' + t }}" class="{{ 'on' if tab == t }}">{{ label }}</a>{% endfor %}</nav>{% endif %}
-<p class="muted">Who brings the snack each meeting night. Can't make your night? Ask another member to swap below; they approve or decline here, and you both get an email.
-{% if leader %}Leaders can change the schedule directly; the Secretary keeps it.{% endif %}</p>
+<p class="muted">Who brings chow (the meal) each meeting night. Can't make your night? Ask another member to swap below; they approve or decline here, and you both get an email.
+{% if leader %}Officers can change the schedule directly; the Secretary keeps it.{% endif %}</p>
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
 
 {% for r in asked %}
@@ -43,8 +43,8 @@
 </tbody></table>
 
 {% if leader %}<h2>Swap two nights</h2>
-<form method="post" action="/chow/swap" class="inline">
-  {% for f in ('a', 'b') %}<select name="{{ f }}" aria-label="Night">{% for d, x in upcoming if x.member and x.status != 'none' %}<option value="{{ d }}" {{ 'selected' if loop.index == (1 if f == 'a' else 2) }}>{{ fmt(d) }}: {{ club.short(x.member) }}</option>{% endfor %}</select>{% if f == 'a' %} ⇄ {% endif %}{% endfor %}
+<form method="post" action="/chow/swap" class="inline" onsubmit="const [a, b] = [...this.querySelectorAll('select')].map((x) => x.selectedOptions[0].text); if (this.a.value === this.b.value) { alert('Pick two different nights.'); return false; } return confirm(`Swap ${a} and ${b}? Both members and the Secretary are emailed.`)">
+  {% for f in ('a', 'b') %}<select name="{{ f }}" aria-label="Night" required><option value="" selected disabled>Pick a night…</option>{% for d, x in upcoming if x.member and x.status != 'none' %}<option value="{{ d }}">{{ fmt(d) }}: {{ club.short(x.member) }}</option>{% endfor %}</select>{% if f == 'a' %} ⇄ {% endif %}{% endfor %}
   <button class="btn small">Swap</button>
 </form>
 <p class="hint">Both members and the Secretary are emailed. Changes made on a meeting night go into that meeting's minutes.</p>
