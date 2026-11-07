@@ -1,0 +1,2 @@
+{# A member's picture, or a coloured circle with their initials. size: xs (in pills), sm (lists), md (menu), lg (member page). #}
+{% macro avatar(mid, size='sm') %}{% set u = avatar_url(mid) %}{% if u %}<img class="avatar {{ size }}" src="{{ u }}" alt="" loading="lazy">{% else %}<span class="avatar {{ size }} initials" style="--h: {{ avatar_hue(mid or '') }}" aria-hidden="true">{{ initials(mid) }}</span>{% endif %}{% endmacro %}

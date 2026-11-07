@@ -1,6 +1,6 @@
 [project]
 name = "w8lbz-minutes"
-version = "0.6.0"
+version = "0.7.0"
 description = "Meeting minutes, attendance and club records for the W8LBZ amateur radio club"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]

@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import ai, business, chow, console, membership, profile, updates
+from . import ai, avatars, business, chow, console, membership, profile, updates
 from . import auth as authmod
 from .auth import Auth, _safe_next
 from .club import DATA, PREVIEW
@@ -72,6 +72,12 @@ def monthday(md: str | None) -> str:
 templates.env.filters["monthday"] = monthday
 templates.env.filters["tsfull"] = lambda t: (dt.datetime.fromtimestamp(t).strftime(DATES["list"] + ", %-I:%M %p")
                                              .replace("AM", "am").replace("PM", "pm")) if t else ""
+def _initials(mid: str | None) -> str:
+    m = archive.club.members.get(mid or "")
+    return ((m.first[:1] + m.last[:1]) if m else (mid or "?")[:2]).upper()
+
+
+templates.env.globals.update(avatar_url=avatars.url, avatar_hue=avatars.hue, initials=_initials)
 templates.env.filters["isodate"] = lambda d: dt.date.fromisoformat(d)
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 def _assets_stamp() -> str:
@@ -719,9 +725,47 @@ def clean_address(text: str) -> str:
 
 
 @app.get("/profile", response_class=HTMLResponse)
-def profile_page(request: Request, saved: int = 0, email_sent: str = "", error: str = "", mid: str = Depends(me)):
+def profile_page(request: Request, saved: int = 0, email_sent: str = "", error: str = "", photo: int = 0,
+                 mid: str = Depends(me)):
     return page(request, "profile.html", m=archive.club.members[mid], shareable=SHAREABLE,
-                saved=saved, email_sent=email_sent, error=error)
+                saved=saved, email_sent=email_sent, error=error, photo=photo)
+
+
+@app.post("/profile/photo")
+async def profile_photo(request: Request, mid: str = Depends(me)):
+    """Upload (or replace) your own profile picture."""
+    form = await request.form()
+    f = form.get("photo")
+    data = await f.read(avatars.MAX_UPLOAD + 1) if f is not None and hasattr(f, "read") else b""
+    try:
+        avatars.save(mid, data)
+    except ValueError as e:
+        return RedirectResponse("/profile?error=" + quote(str(e)), status_code=303)
+    return RedirectResponse("/profile?photo=1", status_code=303)
+
+
+@app.post("/profile/photo/remove")
+def profile_photo_remove(mid: str = Depends(me)):
+    avatars.remove(mid)
+    return RedirectResponse("/profile", status_code=303)
+
+
+@app.post("/members/{who}/photo/remove")
+def member_photo_remove(request: Request, who: str, mid: str = Depends(officer)):
+    """Officers (and admins in admin mode) can take down someone's picture."""
+    if avatars.remove(who):
+        _log.info("%s removed the profile picture of %s", mid, who)
+    return RedirectResponse(f"/members/{who}", status_code=303)
+
+
+@app.get("/avatars/{name}")
+def avatar_file(name: str, mid: str = Depends(me)):
+    """Pictures are for signed-in members only; the address changes with the picture, so cache it."""
+    who = name.removesuffix(".jpg")
+    if who not in archive.club.members or not avatars.path(who).exists():
+        raise HTTPException(404)
+    return FileResponse(avatars.path(who), media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
 @app.post("/profile")
@@ -959,13 +1003,16 @@ def member(request: Request, mid: str):
     elevated = admin_mode(request)
     contact = [(f, v if v and club.can_see(viewer, mid, f, elevated) else None, href) for f, (v, href) in values.items()]
     return page(request, "member.html", member=m, h=archive.member_history(mid), total=len(archive.meetings),
-                contact=contact, is_me=viewer == mid, is_officer=privileged(request),
+                contact=contact, is_me=viewer == mid, is_officer=privileged(request), is_officer_or_admin=privileged(request),
                 can_view_as=elevated and mid != request.state.real_member)
 
 
 @app.get("/roster", response_class=HTMLResponse)
-def roster(request: Request, status: str = "Active", p: str = Query("1", alias="page"), per: str = ""):
-    """Everyone on the roster; contact details are on each member's own page."""
+def roster(request: Request, status: str = "Active", p: str = Query("1", alias="page"), per: str = "", view: str = ""):
+    """Everyone on the roster, as a list or as cards (remembered in a cookie); contact details are on member pages."""
+    view = view if view in ("list", "cards") else request.cookies.get("roster_view", "list")
+    if view not in ("list", "cards"):
+        view = "list"
     def since(m):
         try:
             return dt.date.fromisoformat(m.member_since) if m.member_since else None
@@ -975,10 +1022,12 @@ def roster(request: Request, status: str = "Active", p: str = Query("1", alias="
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
     statuses = sorted({m.status for m in ms}, key=lambda x: (x != "Active", x))
     shown = [m for m in ms if status == "all" or m.status == status]
-    return page(request, "roster.html", pg=paginate([(m, since(m)) for m in shown], p, per, 50),
-                active=sum(m.status.lower() not in gone for m in ms), statuses=statuses, status=status,
-                is_officer=privileged(request),
-                can_add=archive.club.keeps_roster(request.state.member) or admin_mode(request))
+    response = page(request, "roster.html", pg=paginate([(m, since(m)) for m in shown], p, per, 50),
+                    active=sum(m.status.lower() not in gone for m in ms), statuses=statuses, status=status,
+                    is_officer=privileged(request), view=view,
+                    can_add=archive.club.keeps_roster(request.state.member) or admin_mode(request))
+    response.set_cookie("roster_view", view, max_age=365 * 86400, samesite="lax", httponly=True)
+    return response
 
 
 @app.get("/bylaws", response_class=HTMLResponse)
