@@ -20,7 +20,7 @@ from .club import DATA, PREVIEW
 
 log = logging.getLogger("w8lbz.updates")
 REPO = "W8LBZ/minutes"
-CHECK_EVERY = 6 * 3600
+CHECK_EVERY = 3600  # GitHub allows 60 unauthenticated checks an hour; one is plenty
 
 
 def running() -> str:

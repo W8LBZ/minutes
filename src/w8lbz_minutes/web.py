@@ -165,8 +165,8 @@ def page(request: Request, name: str, **ctx) -> HTMLResponse:
 
 
 def _update_badge(request: Request) -> str | None:
-    """For admins in admin mode: the newer version, if there is one (cached check, see updates.py)."""
-    if not (getattr(request.state, "admin_until", None) and archive.club.is_admin(getattr(request.state, "real_member", None))):
+    """For admins (in admin mode or not): the newer version, if there is one (cached check, see updates.py)."""
+    if not archive.club.is_admin(getattr(request.state, "real_member", None)):
         return None
     try:
         rel = updates.available()

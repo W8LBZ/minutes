@@ -11,8 +11,8 @@ try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark"
   {% if me %}{% set here = request.url.path %}
   {% for href, label in (('/', 'Archive'), ('/roster', 'Roster'), ('/stats', 'Stats'), ('/business', 'Business'), ('/chow', 'Chow'), ('/guests', 'Guests'), ('/links', 'Links')) + ((('/console', 'Lead a meeting'),) if can_lead else ()) %}<a href="{{ href }}" class="{{ 'on' if (here == href or (href != '/' and here.startswith(href)) or (href == '/' and here.startswith('/meetings'))) }}">{{ label }}</a>{% endfor %}
   <form action="/search"><input name="q" type="search" placeholder="Search all minutes…" value="{{ q or '' }}"></form>
-  <details class="menu"><summary class="me">{{ avatar(me.id, 'md') }}{{ me.short or me.first }} ▾</summary>
-    <div class="drop"><a href="/profile">Your profile</a><a href="/about">About</a>{% if is_admin and admin_until %}<a href="/admin/email">Email log</a><a href="/admin/updates">Updates{% if update_available %} <span class="badge">{{ update_available }}</span>{% endif %}</a>{% endif %}
+  <details class="menu"><summary class="me">{{ avatar(me.id, 'md') }}{{ me.short or me.first }}{% if update_available %}<span class="dot" title="An update is available"></span>{% endif %} ▾</summary>
+    <div class="drop"><a href="/profile">Your profile</a><a href="/about">About</a>{% if update_available and not admin_until %}<a href="/admin/updates" class="updnote">⬆ Update to {{ update_available }}<small>Turns on admin mode first</small></a>{% endif %}{% if is_admin and admin_until %}<a href="/admin/email">Email log</a><a href="/admin/updates">Updates{% if update_available %} <span class="badge">{{ update_available }}</span>{% endif %}</a>{% endif %}
     {% if is_admin %}<form method="post" action="/admin/mode"><input type="hidden" name="on" value="{{ 0 if admin_until else 1 }}"><input type="hidden" name="next" value="{{ request.url.path }}">
       <button type="submit"><span class="ico">🛡️</span>{{ 'Turn off admin mode' if admin_until else 'Turn on admin mode' }}</button></form>{% endif %}
     <div class="sep"></div>
@@ -25,6 +25,7 @@ try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark"
 <form method="post" action="/admin/view-as"><input type="hidden" name="member" value=""><input type="hidden" name="next" value="/members/{{ viewing_as }}"><button type="submit">Stop</button></form></div>{% endif %}
 {% if admin_until %}<div class="adminbar">Admin mode is on until {{ admin_until|clock }}: you can see and change what officers can.{% if update_available %} <a href="/admin/updates" class="updlink">Version {{ update_available }} is available</a>{% endif %}
 <form method="post" action="/admin/mode"><input type="hidden" name="on" value="0"><input type="hidden" name="next" value="{{ request.url.path }}"><button type="submit">Turn off</button></form></div>{% endif %}
+{% if update_available and not admin_until %}<div class="updbar">Version {{ update_available }} of the app is available. <a href="/admin/updates">Install it when you're ready</a> (you'll turn on admin mode first).</div>{% endif %}
 {% if PREVIEW %}<div class="preview">PREVIEW of <b>{{ PREVIEW }}</b>: a copy of the data. Emails aren't sent{% if is_admin and admin_until %} (see the <a href="/admin/email">email log</a>){% endif %} and roster edits don't reach the real sheet.</div>{% endif %}
 <main>{% block body %}{% endblock %}</main>
 <script src="/static/sort.js?v={{ ASSETS }}"></script>

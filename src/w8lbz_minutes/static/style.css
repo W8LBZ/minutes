@@ -313,3 +313,8 @@ form.profile .fixedrow label { flex: 1 1 9rem; margin: .2rem 0 .5rem; font-weigh
 form.profile input[readonly] { width: 100%; background: var(--surface-3); color: var(--muted); border-style: dashed; cursor: default; }
 form.profile input[readonly]:focus { box-shadow: none; border-color: var(--border-strong); }
 @media (max-width: 1150px) { nav.top input[type=search] { width: 7rem; } nav.top .brand { margin-right: .3rem; } }
+/* update available (admins) */
+nav.top .me .dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: #f2b33d; margin-left: .35rem; box-shadow: 0 0 0 2px var(--nav-bg); }
+.updbar { background: var(--info-soft); color: var(--text); border-bottom: 1px solid var(--border); padding: .45rem 1rem; font-size: .9rem; text-align: center; }
+nav.top .drop a.updnote { background: var(--warn-soft); color: var(--warn-text); font-weight: 600; margin-bottom: .2rem; }
+nav.top .drop a.updnote small { display: block; font-weight: normal; font-size: .78rem; }
