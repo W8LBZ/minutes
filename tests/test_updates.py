@@ -73,12 +73,16 @@ def test_admin_page(env, tmp_path, monkeypatch):
     token = a.new_session("ko4cgq")
     c.cookies.set(web.COOKIE, token)
     assert c.get("/admin/updates", follow_redirects=False).headers["location"].startswith("/admin/confirm")
+    page = c.get("/links").text                                                  # admins hear about it outside admin mode too
+    assert "Version 0.7.0 of the app is available" in page and "Update to 0.7.0" in page and 'class="dot"' in page
     a.set_admin(token, 60)
     page = c.get("/admin/updates").text
     assert "Version 0.7.0" in page and "copy business.json" in page and "I've done these steps" in page
+    assert "<strong>Business items are tracked</strong>" in page and "<li>" in page            # the notes are rendered
     assert "Version 0.7.0 is available" in c.get("/links").text                  # the admin banner says so
     assert "needs the steps" in c.post("/admin/updates/run", data={"target": "0.7.0"}).text
     c.post("/admin/updates/run", data={"target": "0.7.0", "notes_done": 1})
     assert (tmp_path / "update-request.json").exists() and "Updating to 0.7.0" in c.get("/admin/updates").text
     c.cookies.set(web.COOKIE, a.new_session("bob"))
+    assert "of the app is available" not in c.get("/links").text                 # not for members
     assert c.post("/admin/updates/run", data={"target": "0.7.0", "notes_done": 1}).status_code == 403

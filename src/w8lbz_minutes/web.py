@@ -78,6 +78,13 @@ def _initials(mid: str | None) -> str:
 
 
 templates.env.globals.update(avatar_url=avatars.url, avatar_hue=avatars.hue, initials=_initials)
+def _md(text: str | None) -> Markup:
+    """Markdown to HTML for release notes (from our own CHANGELOG via GitHub). Raw HTML is escaped first."""
+    import markdown
+    return Markup(markdown.markdown((text or "").replace("&", "&amp;").replace("<", "&lt;")))
+
+
+templates.env.filters["md"] = _md
 templates.env.filters["isodate"] = lambda d: dt.date.fromisoformat(d)
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 def _assets_stamp() -> str:
@@ -165,8 +172,8 @@ def page(request: Request, name: str, **ctx) -> HTMLResponse:
 
 
 def _update_badge(request: Request) -> str | None:
-    """For admins in admin mode: the newer version, if there is one (cached check, see updates.py)."""
-    if not (getattr(request.state, "admin_until", None) and archive.club.is_admin(getattr(request.state, "real_member", None))):
+    """For admins (in admin mode or not): the newer version, if there is one (cached check, see updates.py)."""
+    if not archive.club.is_admin(getattr(request.state, "real_member", None)):
         return None
     try:
         rel = updates.available()
