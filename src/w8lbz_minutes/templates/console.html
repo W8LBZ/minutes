@@ -15,6 +15,7 @@
 <form method="post" action="/console/{{ m.slug }}/discard" onsubmit="return confirm('Discard this draft completely? This cannot be undone.')" style="text-align:right">
   <button class="btn small ghost" type="submit">Discard draft</button></form>
 <script>window.CONSOLE = {{ data|safe }};</script>
+<script src="/static/combo.js"></script>
 <script src="/static/console.js"></script>
 <script>
 document.getElementById("share").addEventListener("click", async (e) => {
