@@ -81,14 +81,16 @@ def sync_business(archive: Archive, slug: str, s: dict) -> None:
 
 
 # ---------------- AI "ask about" prompts for Community Reports (ai.ask_about) ----------------
-REPORTS_BACK = 4
+REPORTS_BACK = 4    # a member's last few reports, however many meetings apart (they may come every third week)
+REPORTS_DAYS = 365  # but nothing older than a year
 
 
 def report_histories(archive: Archive) -> dict[str, list[tuple[str, str]]]:
     """Each active member's last few community reports from submitted minutes, oldest first."""
     out: dict[str, list[tuple[str, str]]] = {}
+    cutoff = dt.date.today() - dt.timedelta(days=REPORTS_DAYS)
     for mt in archive.meetings:  # newest first
-        if mt.status == "draft":
+        if mt.status == "draft" or mt.date < cutoff:
             continue
         for it in mt.items("Community Reports"):
             m = archive.club.members.get(it.member or "")

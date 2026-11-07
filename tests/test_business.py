@@ -148,7 +148,7 @@ def test_comments_history_and_notes(env, monkeypatch):
     assert c.post("/business/notes", data={"text": "x", "meeting": "2027-01-01"}).status_code == 400
     c.post("/business/notes", data={"text": "Can't make the 12th. I built a new minutes app.", "meeting": "2026-11-12"})
     n = business.load()["notes"][0]
-    assert "Your note for" in c.get("/business").text
+    assert "Your note for" in c.get("/business?tab=notes").text
     assert "Only the meeting" in c.post(f"/business/notes/{n['id']}/read").text   # only a leader marks it read
     who["id"] = "sec"
     s = business.load()

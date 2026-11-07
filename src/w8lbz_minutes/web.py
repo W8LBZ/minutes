@@ -229,7 +229,8 @@ def business_change(request: Request, fn, meeting: str = "", back: str = "/busin
             if request.headers.get("accept", "").startswith("application/json"):
                 return JSONResponse({"error": str(e)}, status_code=409)
             path, _, frag = back.partition("#")
-            return RedirectResponse(f"{path}?error=" + quote(str(e)) + (f"#{frag}" if frag else ""), status_code=303)
+            return RedirectResponse(f"{path}{'&' if '?' in path else '?'}error=" + quote(str(e))
+                                    + (f"#{frag}" if frag else ""), status_code=303)
         business.save(s)
         if meeting:
             console.sync_business(archive, meeting, s)
@@ -245,7 +246,7 @@ def _may_edit_item(request: Request, s: dict, iid: str) -> None:
 
 
 @app.get("/business", response_class=HTMLResponse)
-def business_page(request: Request, error: str = "", note: str = "", mid: str = Depends(me)):
+def business_page(request: Request, tab: str = "open", error: str = "", note: str = "", mid: str = Depends(me)):
     s = console.business_state(archive)
     today = dt.date.today().isoformat()
     items = [business.view(archive.club, x, today) for x in s["items"]]
@@ -258,7 +259,14 @@ def business_page(request: Request, error: str = "", note: str = "", mid: str = 
     submitted = [m for m in archive.meetings if m.status != "draft"][:6]
     my_notes = [n for n in s["notes"] if n["by"] == mid and n["status"] == "pending"]
     all_notes = [n for n in s["notes"] if n["status"] == "pending"] if leader_ else []
-    return page(request, "business.html", open_items=open_, done=done, error=error, note=note, leader=leader_,
+    tabs = [("open", f"Open ({len(open_)})"), ("notes", "Notes for the next meeting"), ("done", "Done")]
+    if leader_:
+        tabs.insert(1, ("add", "Add an item"))
+    if leader_ and (pending or ai.configured(archive.club)):
+        tabs.append(("suggestions", f"Suggestions ({len(pending)})"))
+    if tab not in dict(tabs):
+        tab = "open"
+    return page(request, "business.html", tab=tab, tabs=tabs, open_items=open_, done=done, error=error, note=note, leader=leader_,
                 my_notes=my_notes, all_notes=all_notes, next_meetings=upcoming_meetings(),
                 suggestions=pending, ai_on=ai.configured(archive.club) and leader_, submitted=submitted,
                 by_id={x["id"]: x for x in items},
@@ -302,8 +310,8 @@ def business_suggest(request: Request, meeting: str = Form(...), mid: str = Depe
     try:
         msg = run_followups(meeting)
     except ai.AIError as e:
-        return RedirectResponse("/business?error=" + quote(str(e)), status_code=303)
-    return RedirectResponse("/business?note=" + quote(msg) + "#suggestions", status_code=303)
+        return RedirectResponse("/business?tab=suggestions&error=" + quote(str(e)), status_code=303)
+    return RedirectResponse("/business?tab=suggestions&note=" + quote(msg), status_code=303)
 
 
 @app.post("/business/suggestions/{sid}/accept")
@@ -312,12 +320,12 @@ def suggestion_accept(request: Request, sid: str, text: str = Form(""), owner: s
     if owner and owner not in archive.club.members:
         raise HTTPException(404)
     return business_change(request, lambda s: business.accept_suggestion(s, sid, mid, text or None, owner, due),
-                           back="/business#suggestions")
+                           back="/business?tab=suggestions")
 
 
 @app.post("/business/suggestions/{sid}/dismiss")
 def suggestion_dismiss(request: Request, sid: str, mid: str = Depends(leader)):
-    return business_change(request, lambda s: business.dismiss_suggestion(s, sid, mid), back="/business#suggestions")
+    return business_change(request, lambda s: business.dismiss_suggestion(s, sid, mid), back="/business?tab=suggestions")
 
 
 @app.post("/business/add")
@@ -326,7 +334,8 @@ def business_add(request: Request, text: str = Form(...), owner: str = Form(""),
     if not can_lead_now(request):
         raise HTTPException(403, "Only leaders can add business items.")
     return business_change(request, lambda s: business.add(s, text, mid, owner if owner in archive.club.members else None,
-                                                           due, agenda, opened=meeting or None), meeting)
+                                                           due, agenda, opened=meeting or None), meeting,
+                           back="/business?note=Added." if not meeting else "/business")
 
 
 @app.post("/business/{iid}/edit")
@@ -363,7 +372,7 @@ def upcoming_meetings(n: int = 4) -> list[dt.date]:
 def business_note_add(request: Request, text: str = Form(...), meeting: str = Form(...), mid: str = Depends(me)):
     if meeting not in {d.isoformat() for d in upcoming_meetings()}:
         raise HTTPException(400, "Pick one of the next meetings.")
-    return business_change(request, lambda s: business.add_note(s, mid, text, meeting), back="/business#notes")
+    return business_change(request, lambda s: business.add_note(s, mid, text, meeting), back="/business?tab=notes")
 
 
 @app.post("/business/notes/{nid}/{status}")
@@ -371,7 +380,7 @@ def business_note_status(request: Request, nid: str, status: str, meeting: str =
     if status not in ("read", "dismissed", "withdrawn"):
         raise HTTPException(404)
     return business_change(request, lambda s: business.note_status(s, nid, status, mid, can_lead_now(request)),
-                           meeting, back="/business#notes")
+                           meeting, back="/business?tab=notes")
 
 
 @app.post("/business/{iid}/done")
@@ -379,7 +388,7 @@ def business_done(request: Request, iid: str, done: int = Form(1), meeting: str 
     def run(s):
         _may_edit_item(request, s, iid)
         business.close(s, iid, mid, meeting or None) if done else business.reopen(s, iid, mid)
-    return business_change(request, run, meeting)
+    return business_change(request, run, meeting, back="/business?tab=done" if done else f"/business#i{iid}")
 
 
 @app.post("/business/{iid}/delete")

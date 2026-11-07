@@ -1,116 +1,135 @@
-{% extends "base.html" %}{% block title %}Business<script>
-// One panel (Comment / Edit / History) open at a time under each item.
-document.querySelectorAll("button.act[data-panel]").forEach((b) => b.addEventListener("click", () => {
-  const p = document.getElementById(b.dataset.panel), wasOpen = !p.hidden;
-  b.closest("li").querySelectorAll(".panel").forEach((x) => (x.hidden = true));
-  b.closest("li").querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
-  if (!wasOpen) { p.hidden = false; b.classList.add("on"); p.querySelector("textarea")?.focus(); }
-}));
-document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => {
-  b.closest(".panel").hidden = true; b.closest("li").querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
-}));
-</script>
-{% endblock %}{% block body %}
+{% extends "base.html" %}{% block title %}Business{% endblock %}{% block body %}
 <h1>Business items</h1>
 <p class="muted">Club business from the meetings. Each item stays in Old Business every week until it's marked done, so nothing gets dropped.
-{% if leader %}Leaders can change any item; members can update the ones they own.{% else %}If an item is yours, you can update it or mark it done.{% endif %}</p>
+{% if leader %}Leaders can change any item; members can update the ones they own.{% else %}Anyone can comment; if an item is yours, you can update it or mark it done.{% endif %}</p>
+<nav class="tabs">{% for t, label in tabs %}<a href="/business?tab={{ t }}" class="{{ 'on' if tab == t }}">{{ label }}</a>{% endfor %}</nav>
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
 {% if note %}<p class="msg ok">{{ note }}</p>{% endif %}
 
-{% if suggestions or ai_on %}<section class="suggestions" id="suggestions">
-<h2>Suggested follow-ups <span class="badge ai">AI</span></h2>
-<p class="hint">An AI read the minutes and suggests these. Nothing is added until you accept it: check each one, fix the wording, owner or date, then Accept, or Dismiss it.</p>
-{% for g in suggestions %}{% set it = by_id.get(g.item) %}<div class="sugg">
-  <form method="post" action="/business/suggestions/{{ g.id }}/accept" class="profile">
-    {% if g.kind == 'update' and it %}<div><b>For:</b> {{ it.text }}</div>
-    <input type="hidden" name="text" value="">
-    {% else %}<label>Item <textarea name="text" rows="2">{{ g.text }}</textarea></label>{% endif %}
-    <label>Owner <select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == g.owner }}>{{ m.name }}</option>{% endfor %}</select></label>
-    <label>Due <input type="date" name="due" value="{{ g.due or '' }}"></label>
-    <p class="hint">From the <a href="/meetings/{{ g.meeting }}">{{ fmt(g.meeting) }}</a> minutes{% if g.why %}: “{{ g.why }}”{% endif %}</p>
-    <button class="btn small">{{ 'Accept the change' if g.kind == 'update' else 'Accept' }}</button>
-  </form>
-  <form method="post" action="/business/suggestions/{{ g.id }}/dismiss"><button class="btn small ghost">Dismiss</button></form>
-</div>{% else %}<p class="muted">No suggestions waiting.</p>{% endfor %}
-{% if ai_on %}<form method="post" action="/business/suggest" class="inline">Ask again for the minutes of
-  <select name="meeting">{% for m in submitted %}<option value="{{ m.slug }}">{{ fmt(m.slug) }}</option>{% endfor %}</select>
-  <button class="btn small ghost">Suggest follow-ups</button> <span class="hint">This happens by itself when minutes are submitted. It takes a few seconds.</span></form>{% endif %}
-</section>{% endif %}
+{% macro timeline(x) %}{# changes and comments together, newest first #}
+{% set ev = [] %}{% for e in x.history %}{% set _ = ev.append({'at': e.at, 'e': e}) %}{% endfor %}
+{% for c in x.comments or [] %}{% set _ = ev.append({'at': c.at, 'c': c}) %}{% endfor %}
+<ul class="timeline">{% for t in ev|sort(attribute='at', reverse=True) %}<li>
+  <span class="muted small">{{ t.at|tsfull }}{% set who = (t.e or t.c).by %}{% if who %} · {{ club.short(who) }}{% endif %}{% if t.e and t.e.meeting %} · at the <a href="/meetings/{{ t.e.meeting }}">{{ fmt(t.e.meeting) }}</a> meeting{% endif %}</span>
+  {% if t.c %}<div class="tl-comment">💬 {{ t.c.text }}</div>
+  {% else %}<div>{{ t.e.what|capitalize }}</div>{% for f, ov in (t.e.changes or {}).items() %}<div class="change small"><b>{{ f }}:</b> <s class="muted">{{ ov[0] or '(none)' }}</s> → {{ ov[1] or '(none)' }}</div>{% endfor %}{% endif %}
+</li>{% endfor %}</ul>
+{% endmacro %}
 
-<section id="notes" class="notes">
-<h2>Notes for the next meeting</h2>
-<p class="hint">Can't make it, or have news for the club? Leave a note: the leader sees it during Community Reports and reads it out.</p>
-{% for n in my_notes %}<div class="comment"><span class="muted small">Your note for {{ fmt(n.meeting) }}</span>
-  <form method="post" action="/business/notes/{{ n.id }}/withdrawn" class="inline"><button class="linkbtn">Withdraw</button></form><div>{{ n.text }}</div></div>{% endfor %}
-<form method="post" action="/business/notes" class="profile">
-  <label>For the meeting on <select name="meeting">{% for d in next_meetings %}<option value="{{ d.isoformat() }}">{{ d.strftime('%A, %B %-d') }}</option>{% endfor %}</select></label>
-  <label>Note <textarea name="text" rows="3" required placeholder="e.g. I'll be away for this one. Since last time I finished my 40 m dipole and made a few contacts with it."></textarea></label>
-  <button class="btn small">Send note</button></form>
-{% if all_notes %}<h3>Waiting to be read <span class="muted small">(leaders)</span></h3>
-{% for n in all_notes %}<div class="comment"><b>{{ club.name(n.by) }}</b> <span class="muted small">for {{ fmt(n.meeting) }}</span><div>{{ n.text }}</div></div>{% endfor %}{% endif %}
-</section>
-
-<h2>Open <span class="muted small">{{ open_items|length }}</span></h2>
-<ul class="business">{% for x in open_items %}{% set mine = leader or x.owner == me.id %}<li class="{{ 'overdue' if x.overdue }}" id="i{{ x.id }}">
-  <div class="text">{{ x.text }}</div>
-  <div class="meta muted small">
-    {% if x.owner %}<a href="/members/{{ x.owner }}">{{ x.owner_name }}</a>{% else %}No owner{% endif %}
-    {% if x.due %} · <span class="{{ 'late' if x.overdue }}">due {{ fmt(x.due) }}{% if x.overdue %} (overdue){% endif %}</span>{% endif %}
-    {% if x.agenda and x.agenda > today %} · on the agenda for {{ fmt(x.agenda) }}{% endif %}
-    {% if x.quiet %} · <span class="badge warn" title="Nothing has changed on it for weeks">quiet for a while: still on?</span>{% endif %}
-    · since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a>
+{% if tab == 'open' %}
+<div class="cards">{% for x in open_items %}{% set mine = leader or x.owner == me.id %}{% set cs = x.comments or [] %}
+<article class="card{{ ' overdue' if x.overdue }}" id="i{{ x.id }}">
+  <div class="card-text">{{ x.text }}</div>
+  <div class="card-meta">
+    {% if x.owner %}<span class="chip">👤 <a href="/members/{{ x.owner }}">{{ x.owner_name }}</a></span>{% else %}<span class="chip muted">No owner</span>{% endif %}
+    {% if x.due %}<span class="chip{{ ' late' if x.overdue }}">📅 due {{ fmt(x.due) }}{% if x.overdue %} · overdue{% endif %}</span>{% endif %}
+    {% if x.agenda and x.agenda > today %}<span class="chip">⏸ on the agenda for {{ fmt(x.agenda) }}</span>{% endif %}
+    {% if x.quiet %}<span class="chip warn" title="Nothing has changed on it for weeks">quiet for a while: still on?</span>{% endif %}
+    <span class="muted small">since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a></span>
   </div>
-  {% for c in x.comments or [] %}<div class="comment"><span class="who">{{ club.short(c.by) }}</span> <span class="muted small">{{ c.at|tsfull }}</span>
-    {% if leader or c.by == me.id %}<form method="post" action="/business/{{ x.id }}/comments/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')"><button class="linkbtn" title="Delete this comment">Delete</button></form>{% endif %}
-    <div>{{ c.text }}</div></div>{% endfor %}
+  {% if cs %}<div class="comments">
+    {% if cs|length > 2 %}<button type="button" class="linkbtn more" data-more="m{{ x.id }}">Show all {{ cs|length }} comments</button>{% endif %}
+    {% for c in cs %}<div class="comment"{% if loop.revindex > 2 %} data-group="m{{ x.id }}" hidden{% endif %}>
+      <span class="who">{{ club.short(c.by) }}</span> <span class="muted small">{{ c.at|tsfull }}</span>
+      {% if leader or c.by == me.id %}<form method="post" action="/business/{{ x.id }}/comments/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')"><button class="linkbtn" title="Delete this comment">Delete</button></form>{% endif %}
+      <div class="ctext">{{ c.text }}</div></div>{% endfor %}
+  </div>{% endif %}
   <div class="itemacts">
-    <button type="button" class="act" data-panel="c{{ x.id }}">Comment</button>
-    {% if mine %}<button type="button" class="act" data-panel="e{{ x.id }}">Edit</button>
-    <form method="post" action="/business/{{ x.id }}/done" class="inline" onsubmit="return confirm('Mark this item done? It shows as done in the next minutes, then drops off.')"><button class="act">Mark done</button></form>{% endif %}
-    {% if x.history|length > 1 %}<button type="button" class="act" data-panel="h{{ x.id }}">History ({{ x.history|length - 1 }})</button>{% endif %}
+    <button type="button" class="act" data-panel="c{{ x.id }}">💬 Comment</button>
+    {% if mine %}<button type="button" class="act" data-panel="e{{ x.id }}">✎ Edit</button>
+    <form method="post" action="/business/{{ x.id }}/done" class="inline" onsubmit="return confirm('Mark this item done? It shows as done in the next minutes, then drops off.')"><button class="act">✓ Mark done</button></form>{% endif %}
+    <button type="button" class="act" data-panel="h{{ x.id }}">History ({{ x.history|length + cs|length }})</button>
   </div>
   <div class="panel" id="c{{ x.id }}" hidden>
-    <form method="post" action="/business/{{ x.id }}/comment" class="profile"><textarea name="text" rows="2" required placeholder="An update, a question, or an offer to help"></textarea>
-      <button class="btn small">Add comment</button> <button type="button" class="btn small ghost" data-close>Cancel</button></form></div>
+    <form method="post" action="/business/{{ x.id }}/comment" class="modern"><textarea name="text" rows="4" required placeholder="Write an update, a question, or an offer to help…"></textarea>
+      <div class="formrow"><button class="btn small">Add comment</button> <button type="button" class="btn small ghost" data-close>Cancel</button></div></form></div>
   {% if mine %}<div class="panel" id="e{{ x.id }}" hidden>
-    <form method="post" action="/business/{{ x.id }}/edit" class="profile">
-      <label>Item <textarea name="text" rows="2" required>{{ x.text }}</textarea>
+    <form method="post" action="/business/{{ x.id }}/edit" class="modern">
+      <label>Item<textarea name="text" rows="3" required>{{ x.text }}</textarea>
         <span class="hint">Minutes already submitted keep the wording they had; the change shows from the next meeting on.</span></label>
-      {% if leader %}<label>Owner <select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == x.owner }}>{{ m.name }}</option>{% endfor %}</select></label>{% endif %}
-      <label>Due <input type="date" name="due" value="{{ x.due or '' }}"></label>
-      {% if leader %}<label>Hold for the meeting on <input type="date" name="agenda" value="{{ x.agenda or '' }}"> <span class="hint">It stays out of Old Business until that night (e.g. the President's State of the Club).</span></label>{% endif %}
-      <button class="btn small">Save</button> <button type="button" class="btn small ghost" data-close>Cancel</button></form></div>{% endif %}
-  {% if x.history|length > 1 %}<div class="panel" id="h{{ x.id }}" hidden><ul class="history">{% for e in x.history|reverse %}<li>
-    <span class="muted small">{{ e.at|tsfull }}{% if e.by %} · {{ club.short(e.by) }}{% endif %}{% if e.meeting %} · at the <a href="/meetings/{{ e.meeting }}">{{ fmt(e.meeting) }}</a> meeting{% endif %}</span>
-    {{ e.what }}{% for f, ov in (e.changes or {}).items() %}<div class="change small"><b>{{ f }}:</b> <s class="muted">{{ ov[0] or '(none)' }}</s> → {{ ov[1] or '(none)' }}</div>{% endfor %}</li>{% endfor %}</ul></div>{% endif %}
-</li>{% else %}<li class="muted">Nothing open.</li>{% endfor %}</ul>
+      <div class="formrow">
+      {% if leader %}<label>Owner<select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == x.owner }}>{{ m.name }}</option>{% endfor %}</select></label>{% endif %}
+      <label>Due<input type="date" name="due" value="{{ x.due or '' }}"></label>
+      {% if leader %}<label>Hold for the meeting on<input type="date" name="agenda" value="{{ x.agenda or '' }}"></label>{% endif %}
+      </div>
+      {% if leader %}<p class="hint">Hold keeps it out of Old Business until that night (e.g. the President's State of the Club).</p>{% endif %}
+      <div class="formrow"><button class="btn small">Save</button> <button type="button" class="btn small ghost" data-close>Cancel</button></div></form></div>{% endif %}
+  <div class="panel" id="h{{ x.id }}" hidden>{{ timeline(x) }}</div>
+</article>{% else %}<p class="muted">Nothing open.</p>{% endfor %}</div>
 
-{% if leader %}<h2>Add an item</h2>
-<form method="post" action="/business/add" class="profile">
-  <label>Item <textarea name="text" rows="2" required placeholder="e.g. Ask the park about Field Day at Osborn Park"></textarea></label>
-  <label>Owner <select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select></label>
-  <label>Due <input type="date" name="due"></label>
-  <label>Hold for the meeting on <input type="date" name="agenda"> <span class="hint">Leave empty to bring it up at the next meeting.</span></label>
-  <button class="btn small">Add</button>
-  <p class="hint">Items added during a meeting go in from the console's New Business step instead.</p>
-</form>{% endif %}
+{% elif tab == 'add' %}
+<form method="post" action="/business/add" class="modern card">
+  <label>Item<textarea name="text" rows="3" required placeholder="e.g. Ask the park about using the pavilion for Field Day"></textarea></label>
+  <div class="formrow">
+    <label>Owner<select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select></label>
+    <label>Due<input type="date" name="due"></label>
+    <label>Hold for the meeting on<input type="date" name="agenda"></label>
+  </div>
+  <p class="hint">Leave "hold" empty to bring it up at the next meeting. Items raised during a meeting go in from the console's New Business step instead.</p>
+  <div class="formrow"><button class="btn small">Add</button></div>
+</form>
 
-<h2>Done <span class="muted small">latest {{ done|length }}</span></h2>
-<ul class="business done">{% for x in done %}<li>
-  <div class="text">{{ x.text }}</div>
-  <div class="meta muted small">{% if x.owner %}{{ x.owner_name }} · {% endif %}done {{ fmt(x.closed) }} · since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a>
-  {% if leader or x.owner == me.id %}<form method="post" action="/business/{{ x.id }}/done" class="inline"><input type="hidden" name="done" value="0"><button class="btn small ghost">Reopen</button></form>{% endif %}</div>
-</li>{% else %}<li class="muted">Nothing yet.</li>{% endfor %}</ul>
+{% elif tab == 'notes' %}
+<p class="hint">Can't make it, or have news for the club? Leave a note: the leader sees it during Community Reports and reads it out.</p>
+<div class="cards">{% for n in my_notes %}<article class="card"><div class="muted small">Your note for {{ fmt(n.meeting) }}
+  <form method="post" action="/business/notes/{{ n.id }}/withdrawn" class="inline"><button class="linkbtn">Withdraw</button></form></div>
+  <div class="card-text">{{ n.text }}</div></article>{% endfor %}</div>
+<form method="post" action="/business/notes" class="modern card">
+  <label>For the meeting on<select name="meeting">{% for d in next_meetings %}<option value="{{ d.isoformat() }}">{{ d.strftime('%A, %B %-d') }}</option>{% endfor %}</select></label>
+  <label>Note<textarea name="text" rows="4" required placeholder="e.g. I'll be away for this one. Since last time I finished my 40 m dipole and made a few contacts with it."></textarea></label>
+  <div class="formrow"><button class="btn small">Send note</button></div>
+</form>
+{% if all_notes %}<h2>Waiting to be read <span class="muted small">(leaders)</span></h2>
+<div class="cards">{% for n in all_notes %}<article class="card"><div class="muted small"><b>{{ club.name(n.by) }}</b> · for {{ fmt(n.meeting) }}</div>
+  <div class="card-text">{{ n.text }}</div></article>{% endfor %}</div>{% endif %}
+
+{% elif tab == 'done' %}
+<div class="cards">{% for x in done %}<article class="card done" id="i{{ x.id }}">
+  <div class="card-text">✓ {{ x.text }}</div>
+  <div class="card-meta">{% if x.owner %}<span class="chip">👤 {{ x.owner_name }}</span>{% endif %}<span class="chip">done {{ fmt(x.closed) }}</span>
+    <span class="muted small">since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a></span></div>
+  <div class="itemacts">
+    <button type="button" class="act" data-panel="h{{ x.id }}">History ({{ x.history|length + (x.comments or [])|length }})</button>
+    {% if leader or x.owner == me.id %}<form method="post" action="/business/{{ x.id }}/done" class="inline"><input type="hidden" name="done" value="0"><button class="act">↺ Reopen</button></form>{% endif %}
+  </div>
+  <div class="panel" id="h{{ x.id }}" hidden>{{ timeline(x) }}</div>
+</article>{% else %}<p class="muted">Nothing yet.</p>{% endfor %}</div>
+
+{% elif tab == 'suggestions' %}
+<p class="hint">An AI read the minutes and suggests these. Nothing is added until you accept it: check each one, fix the wording, owner or date, then Accept, or Dismiss it.</p>
+<div class="cards">{% for g in suggestions %}{% set it = by_id.get(g.item) %}<article class="card sugg">
+  <span class="badge ai">AI</span>
+  <form method="post" action="/business/suggestions/{{ g.id }}/accept" class="modern">
+    {% if g.kind == 'update' and it %}<div class="card-text"><b>For:</b> {{ it.text }}</div><input type="hidden" name="text" value="">
+    {% else %}<label>Item<textarea name="text" rows="2">{{ g.text }}</textarea></label>{% endif %}
+    <div class="formrow">
+      <label>Owner<select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == g.owner }}>{{ m.name }}</option>{% endfor %}</select></label>
+      <label>Due<input type="date" name="due" value="{{ g.due or '' }}"></label>
+    </div>
+    <p class="hint">From the <a href="/meetings/{{ g.meeting }}">{{ fmt(g.meeting) }}</a> minutes{% if g.why %}: “{{ g.why }}”{% endif %}</p>
+    <div class="formrow"><button class="btn small">{{ 'Accept the change' if g.kind == 'update' else 'Accept' }}</button></div>
+  </form>
+  <form method="post" action="/business/suggestions/{{ g.id }}/dismiss" class="inline"><button class="btn small ghost">Dismiss</button></form>
+</article>{% else %}<p class="muted">No suggestions waiting.</p>{% endfor %}</div>
+{% if ai_on %}<form method="post" action="/business/suggest" class="modern">
+  <div class="formrow"><label>Ask again for the minutes of<select name="meeting">{% for m in submitted %}<option value="{{ m.slug }}">{{ fmt(m.slug) }}</option>{% endfor %}</select></label>
+  <button class="btn small ghost">Suggest follow-ups</button></div>
+  <p class="hint">This happens by itself when minutes are submitted. It takes a few seconds.</p></form>{% endif %}
+{% endif %}
+
 <script>
-// One panel (Comment / Edit / History) open at a time under each item.
+// One panel (Comment / Edit / History) open at a time in each card.
 document.querySelectorAll("button.act[data-panel]").forEach((b) => b.addEventListener("click", () => {
-  const p = document.getElementById(b.dataset.panel), wasOpen = !p.hidden;
-  b.closest("li").querySelectorAll(".panel").forEach((x) => (x.hidden = true));
-  b.closest("li").querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
+  const card = b.closest(".card"), p = document.getElementById(b.dataset.panel), wasOpen = !p.hidden;
+  card.querySelectorAll(".panel").forEach((x) => (x.hidden = true));
+  card.querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
   if (!wasOpen) { p.hidden = false; b.classList.add("on"); p.querySelector("textarea")?.focus(); }
 }));
 document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => {
-  b.closest(".panel").hidden = true; b.closest("li").querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
+  b.closest(".panel").hidden = true; b.closest(".card").querySelectorAll("button.act").forEach((x) => x.classList.remove("on"));
+}));
+document.querySelectorAll("[data-more]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(`[data-group="${b.dataset.more}"]`).forEach((x) => (x.hidden = false)); b.remove();
 }));
 </script>
 {% endblock %}

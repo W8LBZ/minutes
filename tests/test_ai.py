@@ -107,10 +107,11 @@ def test_business_page_suggestions_for_leaders_only(env, monkeypatch, tmp_path):
     assert c.post("/business/suggest", data={"meeting": "2026-11-12"}).status_code == 403
     who["id"] = "sec"
     assert "1 suggestion from the November 12 minutes" in c.post("/business/suggest", data={"meeting": "2026-11-12"}).text
-    page = c.get("/business").text
-    assert "Suggested follow-ups" in page and "Call the park" in page
+    page = c.get("/business?tab=suggestions").text
+    assert "Suggestions (1)" in page and "Call the park" in page
     who["id"] = "amy"
-    assert "Suggested follow-ups" not in c.get("/business").text      # members don't see suggestions
+    page = c.get("/business?tab=suggestions").text
+    assert "Suggestions (" not in page and "Call the park" not in page   # members don't see suggestions
     who["id"] = "sec"
     sid = business.load()["suggestions"][0]["id"]
     c.post(f"/business/suggestions/{sid}/accept", data={"text": "Call the park about Field Day", "owner": "amy", "due": ""})
