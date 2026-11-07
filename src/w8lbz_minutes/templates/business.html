@@ -38,7 +38,7 @@
       <label>Item<textarea name="text" rows="3" required>{{ x.text }}</textarea>
         <span class="hint">Minutes already submitted keep the wording they had; the change shows from the next meeting on.</span></label>
       <div class="formrow">
-      {% if leader %}<label>Owner<select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == x.owner }}>{{ m.name }}</option>{% endfor %}</select></label>{% endif %}
+      {% if leader %}<label>Owner<input name="owner" list="roster-names" autocomplete="off" placeholder="Type a name…" value="{{ club.name(x.owner) if x.owner else '' }}"></label>{% endif %}
       <label>Due<input type="date" name="due" value="{{ x.due or '' }}"></label>
       {% if leader %}<label>Hold for the meeting on<input type="date" name="agenda" value="{{ x.agenda or '' }}"></label>{% endif %}
       </div>
@@ -62,7 +62,7 @@
 <form method="post" action="/business/add" class="modern card">
   <label>Item<textarea name="text" rows="3" required placeholder="e.g. Ask the park about using the pavilion for Field Day"></textarea></label>
   <div class="formrow">
-    <label>Owner<select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select></label>
+    <label>Owner<input name="owner" list="roster-names" autocomplete="off" placeholder="Type a name…"></label>
     <label>Due<input type="date" name="due"></label>
     <label>Hold for the meeting on<input type="date" name="agenda"></label>
   </div>
@@ -104,7 +104,7 @@
     {% if g.kind == 'update' and it %}<div class="card-text"><b>For:</b> {{ it.text }}</div><input type="hidden" name="text" value="">
     {% else %}<label>Item<textarea name="text" rows="2">{{ g.text }}</textarea></label>{% endif %}
     <div class="formrow">
-      <label>Owner<select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == g.owner }}>{{ m.name }}</option>{% endfor %}</select></label>
+      <label>Owner<input name="owner" list="roster-names" autocomplete="off" placeholder="Type a name…" value="{{ club.name(g.owner) if g.owner else '' }}"></label>
       <label>Due<input type="date" name="due" value="{{ g.due or '' }}"></label>
     </div>
     <p class="hint">From the <a href="/meetings/{{ g.meeting }}">{{ fmt(g.meeting) }}</a> minutes{% if g.why %}: “{{ g.why }}”{% endif %}</p>
@@ -118,6 +118,7 @@
   <p class="hint">This happens by itself when minutes are submitted. It takes a few seconds.</p></form>{% endif %}
 {% endif %}
 
+<datalist id="roster-names">{% for m in members %}<option value="{{ m.name }}">{{ m.callsign or '' }}</option>{% endfor %}</datalist>
 <script>
 // One panel (Comment / Edit / History) open at a time in each card.
 document.querySelectorAll("button.act[data-panel]").forEach((b) => b.addEventListener("click", () => {

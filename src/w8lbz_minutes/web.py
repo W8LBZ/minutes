@@ -239,6 +239,21 @@ def business_change(request: Request, fn, meeting: str = "", back: str = "/busin
     return RedirectResponse(back, status_code=303)
 
 
+def owner_id(value: str | None) -> str | None:
+    """The owner box takes a name typed or picked from the list (or a member id, or a callsign)."""
+    v = " ".join((value or "").split())
+    if not v:
+        return None
+    club = archive.club
+    if v.lower() in club.members:
+        return v.lower()
+    hits = [m.id for m in club.members.values()
+            if v.lower() in (m.name.lower(), (m.callsign or "").lower(), club.short(m.id).lower())]
+    if len(hits) != 1:
+        raise ValueError(f"No member called “{v}”. Pick a name from the list.")
+    return hits[0]
+
+
 def _may_edit_item(request: Request, s: dict, iid: str) -> None:
     """Leaders change any item; a member can update the ones they own."""
     if not (can_lead_now(request) or business.get(s, iid)["owner"] == request.state.member):
@@ -317,9 +332,7 @@ def business_suggest(request: Request, meeting: str = Form(...), mid: str = Depe
 @app.post("/business/suggestions/{sid}/accept")
 def suggestion_accept(request: Request, sid: str, text: str = Form(""), owner: str = Form(""), due: str = Form(""),
                       mid: str = Depends(leader)):
-    if owner and owner not in archive.club.members:
-        raise HTTPException(404)
-    return business_change(request, lambda s: business.accept_suggestion(s, sid, mid, text or None, owner, due),
+    return business_change(request, lambda s: business.accept_suggestion(s, sid, mid, text or None, owner_id(owner) or "", due),
                            back="/business?tab=suggestions")
 
 
@@ -333,8 +346,8 @@ def business_add(request: Request, text: str = Form(...), owner: str = Form(""),
                  agenda: str = Form(""), meeting: str = Form(""), mid: str = Depends(me)):
     if not can_lead_now(request):
         raise HTTPException(403, "Only leaders can add business items.")
-    return business_change(request, lambda s: business.add(s, text, mid, owner if owner in archive.club.members else None,
-                                                           due, agenda, opened=meeting or None), meeting,
+    return business_change(request, lambda s: business.add(s, text, mid, owner_id(owner), due, agenda,
+                                                           opened=meeting or None), meeting,
                            back="/business?note=Added." if not meeting else "/business")
 
 
@@ -343,10 +356,10 @@ async def business_edit(request: Request, iid: str, mid: str = Depends(me)):
     form = await request.form()
     allowed = ("text", "owner", "due", "agenda") if can_lead_now(request) else ("text", "due")  # owners: text and due
     fields = {k: form.get(k) for k in allowed if k in form}
-    if fields.get("owner") and fields["owner"] not in archive.club.members:
-        raise HTTPException(404)
     def run(s):
         _may_edit_item(request, s, iid)
+        if "owner" in fields:
+            fields["owner"] = owner_id(fields["owner"])
         business.edit(s, iid, mid, meeting=form.get("meeting") or None, **fields)
     return business_change(request, run, form.get("meeting", ""))
 

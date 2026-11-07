@@ -299,9 +299,10 @@
       const ta = h("textarea", { rows: 1, oninput: (e) => grow(e.target),
         onchange: (e) => send(`/business/${x.id}/edit`, { text: e.target.value }) });
       ta.value = x.text;
-      const owner = h("select", { title: "Owner", onchange: (e) => send(`/business/${x.id}/edit`, { owner: e.target.value }) },
-        h("option", { value: "" }, "No owner"),
-        D.members.map((m) => h("option", { value: m.id, selected: m.id === x.owner }, m.name)));
+      // Type a name (the list filters as you type); the server matches it to a member.
+      const owner = h("input", { list: "roster-names", autocomplete: "off", placeholder: "Owner: type a name", title: "Owner",
+        value: x.owner ? (people[x.owner]?.name || "") : "", class: "ownerbox",
+        onchange: (e) => send(`/business/${x.id}/edit`, { owner: e.target.value.trim() }) });
       const due = h("input", { type: "date", value: x.due || "", title: "Due date",
         onchange: (e) => send(`/business/${x.id}/edit`, { due: e.target.value }) });
       return h("div", { class: "bizitem" + (done ? " done" : "") + (x.overdue ? " overdue" : "") },
@@ -329,7 +330,8 @@
       setTimeout(() => box.querySelectorAll("textarea").forEach(grow), 0);
     };
     draw();
-    return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, HINTS[sec]), box);
+    const names = h("datalist", { id: "roster-names" }, D.members.map((m) => h("option", { value: m.name }, m.callsign || "")));
+    return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, HINTS[sec]), names, box);
   }
 
   // ---------- chow: did tonight's member bring it? The rest is read-only, from the chow schedule. ----------

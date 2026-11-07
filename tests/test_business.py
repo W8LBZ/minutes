@@ -156,3 +156,20 @@ def test_comments_history_and_notes(env, monkeypatch):
     assert [x["text"] for x in business.notes_for(s, "2026-11-12")] == ["Can't make the 12th. I built a new minutes app."]
     r = c.post(f"/business/notes/{n['id']}/read", data={"meeting": "2026-11-12"}, headers={"Accept": "application/json"})
     assert r.json()["notes"] == [] and business.load()["notes"][0]["status"] == "read"
+
+
+def test_owner_typed_by_name(env, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    club, a = env
+    monkeypatch.setattr(web, "archive", a)
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "sec")
+    c = TestClient(web.app)
+    c.get("/business")
+    iid = business.load()["items"][0]["id"]
+    for typed, want in (("Amy Able", "amy"), ("  bob  baker ", "bob"), ("", None)):
+        c.post(f"/business/{iid}/edit", data={"owner": typed})
+        assert business.get(business.load(), iid)["owner"] == want
+    assert "No member called" in c.post(f"/business/{iid}/edit", data={"owner": "Nobody Here"}).text
+    c.post("/business/add", data={"text": "Book the pavilion", "owner": "Amy Able"})
+    assert business.load()["items"][-1]["owner"] == "amy"
