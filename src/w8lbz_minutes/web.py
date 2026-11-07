@@ -72,6 +72,7 @@ def monthday(md: str | None) -> str:
 templates.env.filters["monthday"] = monthday
 templates.env.filters["tsfull"] = lambda t: (dt.datetime.fromtimestamp(t).strftime(DATES["list"] + ", %-I:%M %p")
                                              .replace("AM", "am").replace("PM", "pm")) if t else ""
+templates.env.filters["isodate"] = lambda d: dt.date.fromisoformat(d)
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 def _assets_stamp() -> str:
     """A fingerprint of the CSS and JS, added to their links (?v=...) so browsers fetch new copies after an update."""
@@ -483,7 +484,7 @@ def chow_answer(request: Request, rid: str, approve: int = Form(0), mid: str = D
 @app.post("/chow/assign")
 def chow_assign(request: Request, date: str = Form(...), member: str = Form(""), mid: str = Depends(chow_leader)):
     dt.date.fromisoformat(date)
-    return chow_change(request, lambda s: chow.assign(archive.club, s, date, member or None, mid, base_url(request)))
+    return chow_change(request, lambda s: chow.assign(archive.club, s, date, owner_id(member), mid, base_url(request)))
 
 
 @app.post("/chow/none")
@@ -501,7 +502,7 @@ def chow_swap(request: Request, a: str = Form(...), b: str = Form(...), mid: str
 def chow_record(request: Request, date: str = Form(...), status: str = Form(...), covered_by: str = Form(""),
                 note: str = Form(""), next: str = Form("/chow/history"), mid: str = Depends(leader)):
     def run(s):
-        chow.record(archive.club, s, date, status, mid, covered_by or None, note)
+        chow.record(archive.club, s, date, status, mid, owner_id(covered_by), note)
         return {"section": chow.minutes_section(archive.club, s, chow.history(), date)}  # for the console
     return chow_change(request, run, back=_safe_next(next))
 
@@ -543,7 +544,8 @@ async def chow_constraints(request: Request, mid: str = Depends(chow_leader)):
         raise HTTPException(404)
     weeks = [int(w) for w in form.getlist("not_weeks") if w.isdigit()]
     away = [[form.get("away_from", ""), form.get("away_to", "")]] if form.get("away_from") else []
-    return chow_change(request, lambda s: chow.set_constraints(s, who, weeks, away, form.get("note", ""), mid),
+    skip = int(form.get("skip") or 0) if str(form.get("skip") or "0").isdigit() else 0
+    return chow_change(request, lambda s: chow.set_constraints(s, who, weeks, away, form.get("note", ""), mid, skip),
                        back="/chow/rotation")
 
 
@@ -621,6 +623,8 @@ def admin_confirm_email(request: Request, next: str = Form("/"), mid: str = Depe
     if not m.email:
         raise HTTPException(400, "There's no email address for you on the roster.")
     url = f"{base_url(request)}/admin/confirm/link?t={authn.step_up_link(mid)}&next={quote(_safe_next(next))}"
+    if PREVIEW:  # no email leaves a preview, and its email log is behind admin mode: go straight through
+        return RedirectResponse(url, status_code=303)
     # Only ever to the admin themself, so test mode (email.only_to) doesn't apply.
     authmod.send_email(m.email, "Turn on admin mode", f"Hi {m.first},\n\nSomeone signed in as you asked to turn on admin mode "
                f"in W8LBZ Minutes. If that was you, open this link in the same browser within 5 minutes:\n\n{url}\n\n"
