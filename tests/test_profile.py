@@ -225,7 +225,7 @@ def test_admin_mode(tmp_path, monkeypatch):
     from w8lbz_minutes.auth import Auth
     from w8lbz_minutes.store import Archive
     club = Club(FIX / "test-club.yaml", roster=[
-        {"id": "ko4cgq", "first": "Jim", "last": "F", "callsign": "KO4CGQ"},
+        {"id": "ko4cgq", "first": "Jim", "last": "F", "callsign": "KO4CGQ", "email": "jim@example.org"},
         {"id": "kd8ccc", "first": "Bob", "last": "Member", "phone": "419-555-0199"}])
     club.admins = {"ko4cgq"}
     a = Auth(club, tmp_path / "auth.sqlite")
@@ -237,17 +237,43 @@ def test_admin_mode(tmp_path, monkeypatch):
     assert "419-555-0199" not in c.get("/members/kd8ccc").text          # off by default: an ordinary member
     assert c.get("/roster/changes").status_code == 403
     assert "Turn on admin mode" in c.get("/links").text
-    c.post("/admin/mode", data={"on": 1, "next": "/links"})
+    turn_on_admin_mode(c, monkeypatch)
     page = c.get("/members/kd8ccc").text
     assert "419-555-0199" in page and "Admin mode is on" in page          # on: officer-level view
     assert c.get("/roster/changes").status_code == 200
     c.post("/admin/mode", data={"on": 0})
     assert c.get("/roster/changes").status_code == 403
-    assert [e["on"] for e in map(json.loads, (tmp_path / "admin-log.jsonl").read_text().splitlines())] == [True, False]
+    log = [json.loads(x) for x in (tmp_path / "admin-log.jsonl").read_text().splitlines()]
+    assert [(e["on"], e.get("confirmed_by")) for e in log if "on" in e] == [(True, "email"), (False, None)]
+
+    monkeypatch.setattr(web, "PREVIEW", "some-branch")
+    assert c.get("/preview/outbox").status_code == 200                    # the preview outbox is for admins
 
     c.cookies.set(web.COOKIE, a.new_session("kd8ccc"))                    # not an admin: can't turn it on
     assert c.post("/admin/mode", data={"on": 1}).status_code == 403
+    assert c.get("/admin/confirm").status_code == 403 and c.post("/admin/confirm/email").status_code == 403
     assert "Turn on admin mode" not in c.get("/links").text
+    assert c.get("/preview/outbox").status_code == 404
+    assert "Sign-in &amp; passkeys" not in c.get("/links").text           # it's a tab of Your profile now
+    assert "Sign-in &amp; passkeys" in c.get("/profile").text and "Your details" in c.get("/account").text
+
+
+def turn_on_admin_mode(c, monkeypatch):
+    """Admin mode asks the admin to confirm it's them first: here (no passkey, not the passkey host) by email."""
+    from urllib.parse import urlparse
+    from w8lbz_minutes import web
+    sent = []
+    monkeypatch.setattr(web.authmod, "send_email", lambda to, subject, body, **kw: sent.append((to, body)))
+    r = c.post("/admin/mode", data={"on": 1, "next": "/links"}, follow_redirects=False)
+    assert r.headers["location"].startswith("/admin/confirm")
+    assert "Admin mode is on" not in c.get("/links").text                       # not until confirmed
+    assert "Email me a confirmation link" in c.get(r.headers["location"]).text
+    c.post("/admin/confirm/email", data={"next": "/links"})
+    assert sent and sent[-1][0] == "jim@example.org"
+    link = urlparse(next(w for w in sent[-1][1].split() if "/admin/confirm/link" in w))
+    assert c.get("/admin/confirm/link?t=wrong").url.path == "/admin/confirm"    # a made-up code does nothing
+    assert "Admin mode is on" in c.get(f"{link.path}?{link.query}").text
+    assert "expired" in c.get(f"{link.path}?{link.query}").text                 # and it works once
 
 
 def test_view_as_is_read_only_and_needs_admin_mode(tmp_path, monkeypatch):
@@ -256,7 +282,7 @@ def test_view_as_is_read_only_and_needs_admin_mode(tmp_path, monkeypatch):
     from w8lbz_minutes.auth import Auth
     from w8lbz_minutes.store import Archive
     club = Club(FIX / "test-club.yaml", roster=[
-        {"id": "ko4cgq", "first": "Jim", "last": "F", "callsign": "KO4CGQ"},
+        {"id": "ko4cgq", "first": "Jim", "last": "F", "callsign": "KO4CGQ", "email": "jim@example.org"},
         {"id": "pat", "first": "Pat", "last": "Treasurer", "officer": True, "phone": "419-555-0142"},
         {"id": "bob", "first": "Bob", "last": "Member", "phone": "419-555-0199"}])
     club.admins = {"ko4cgq"}
@@ -267,7 +293,7 @@ def test_view_as_is_read_only_and_needs_admin_mode(tmp_path, monkeypatch):
     c = TestClient(web.app)
     c.cookies.set(web.COOKIE, a.new_session("ko4cgq"))
     assert c.post("/admin/view-as", data={"member": "bob"}).status_code == 403   # admin mode is off
-    c.post("/admin/mode", data={"on": 1})
+    turn_on_admin_mode(c, monkeypatch)
     assert "View the app as Bob" in c.get("/members/bob").text
     c.post("/admin/view-as", data={"member": "bob", "next": "/links"})
     page = c.get("/members/pat").text

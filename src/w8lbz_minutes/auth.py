@@ -273,11 +273,29 @@ class Auth:
                                                user_verification=UserVerificationRequirement.PREFERRED)
         return self._challenge("login", opts.challenge), options_to_json(opts)
 
-    def authenticate(self, cid: str | None, credential: dict) -> str:
-        ch = self._take_challenge(cid, "login")
-        if not ch:
+    def step_up_options(self, member: str) -> tuple[str, str]:
+        """Ask the signed-in member to confirm with one of their own passkeys (before admin mode)."""
+        allow = [PublicKeyCredentialDescriptor(id=base64url_to_bytes(r["id"]))
+                 for r in self.db.execute("select id from passkeys where member=?", (member,))]
+        opts = generate_authentication_options(rp_id=self.rp_id, allow_credentials=allow,
+                                               user_verification=UserVerificationRequirement.REQUIRED)
+        return self._challenge("step-up", opts.challenge, member), options_to_json(opts)
+
+    def step_up_link(self, member: str) -> str:
+        """For an admin without a passkey here: a one-time code, emailed, that only works for them."""
+        return self._challenge("step-up-email", b"", member)
+
+    def use_step_up_link(self, cid: str, member: str) -> bool:
+        ch = self._take_challenge(cid, "step-up-email")
+        return bool(ch and ch["member"] == member)
+
+    def authenticate(self, cid: str | None, credential: dict, kind: str = "login", member: str | None = None) -> str:
+        ch = self._take_challenge(cid, kind)
+        if not ch or (member and ch["member"] != member):
             raise ValueError("Sign-in expired; please try again.")
         row = self.db.execute("select * from passkeys where id=?", (credential.get("id"),)).fetchone()
+        if member and row and row["member"] != member:
+            raise ValueError("That passkey belongs to someone else.")
         if not row:
             raise ValueError("That passkey isn't registered here. Sign in by email, then add it on your account page.")
         v = verify_authentication_response(credential=credential, expected_challenge=ch["challenge"],

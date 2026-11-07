@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
 from . import chow, console, membership, profile
+from . import auth as authmod
 from .auth import Auth, _safe_next
 from .club import DATA, PREVIEW
 from .roster import SHAREABLE, SheetError
@@ -350,14 +351,82 @@ def _admin_log(request: Request, **entry) -> None:
     p.chmod(0o600)
 
 
-@app.post("/admin/mode")
-def admin_mode_switch(request: Request, on: int = Form(0), next: str = Form("/"), mid: str = Depends(real_me)):
-    """Admins turn admin mode on (for ADMIN_MINUTES) or off for this sign-in. Every switch is logged."""
+def _admin(mid: str) -> str:
     if not archive.club.is_admin(mid):
         raise HTTPException(403, "You aren't listed as an admin.")
-    until = authn.set_admin(request.cookies.get(COOKIE), ADMIN_MINUTES if on else 0)
-    _admin_log(request, on=bool(on), until=until)
-    _log.info("admin mode %s for %s", "on" if on else "off", mid)
+    return mid
+
+
+def _admin_on(request: Request, mid: str, how: str) -> None:
+    until = authn.set_admin(request.cookies.get(COOKIE), ADMIN_MINUTES)
+    _admin_log(request, on=True, until=until, confirmed_by=how)
+    _log.info("admin mode on for %s (confirmed by %s)", mid, how)
+
+
+@app.post("/admin/mode")
+def admin_mode_switch(request: Request, on: int = Form(0), next: str = Form("/"), mid: str = Depends(real_me)):
+    """Admins turn admin mode off at once; turning it on first asks them to confirm it's really them."""
+    _admin(mid)
+    if on:
+        return RedirectResponse("/admin/confirm?next=" + quote(_safe_next(next)), status_code=303)
+    until = authn.set_admin(request.cookies.get(COOKIE), 0)
+    _admin_log(request, on=False, until=until)
+    _log.info("admin mode off for %s", mid)
+    return RedirectResponse(_safe_next(next), status_code=303)
+
+
+@app.get("/admin/confirm", response_class=HTMLResponse)
+def admin_confirm(request: Request, next: str = "/", sent: int = 0, error: str = "", mid: str = Depends(real_me)):
+    """Step-up check before admin mode: a passkey where we can, else a one-time link emailed to the admin."""
+    _admin(mid)
+    passkey = request.url.hostname == authn.rp_id and bool(authn.passkeys(mid))
+    return page(request, "admin_confirm.html", next=_safe_next(next), passkey=passkey, sent=sent, error=error,
+                email=archive.club.members[mid].email)
+
+
+@app.post("/admin/confirm/options")
+def admin_confirm_options(mid: str = Depends(real_me)):
+    _admin(mid)
+    cid, options = authn.step_up_options(mid)
+    response = Response(options, media_type="application/json")
+    response.set_cookie(CHALLENGE_COOKIE, cid, max_age=300, httponly=True, samesite="strict", secure=True)
+    return response
+
+
+@app.post("/admin/confirm/verify")
+async def admin_confirm_verify(request: Request, mid: str = Depends(real_me)):
+    _admin(mid)
+    body = await request.json()
+    try:
+        authn.authenticate(request.cookies.get(CHALLENGE_COOKIE), body["credential"], kind="step-up", member=mid)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    _admin_on(request, mid, "passkey")
+    return {"ok": True, "next": _safe_next(body.get("next", "/"))}
+
+
+@app.post("/admin/confirm/email")
+def admin_confirm_email(request: Request, next: str = Form("/"), mid: str = Depends(real_me)):
+    _admin(mid)
+    m = archive.club.members[mid]
+    if not m.email:
+        raise HTTPException(400, "There's no email address for you on the roster.")
+    url = f"{base_url(request)}/admin/confirm/link?t={authn.step_up_link(mid)}&next={quote(_safe_next(next))}"
+    # Only ever to the admin themself, so test mode (email.only_to) doesn't apply.
+    authmod.send_email(m.email, "Turn on admin mode", f"Hi {m.first},\n\nSomeone signed in as you asked to turn on admin mode "
+               f"in W8LBZ Minutes. If that was you, open this link in the same browser within 5 minutes:\n\n{url}\n\n"
+               f"If it wasn't you, don't open it, and sign out your other sessions on your profile page.\n\n73,\nW8LBZ")
+    _admin_log(request, step_up_email=True)
+    return RedirectResponse("/admin/confirm?sent=1&next=" + quote(_safe_next(next)), status_code=303)
+
+
+@app.get("/admin/confirm/link")
+def admin_confirm_link(request: Request, t: str = "", next: str = "/", mid: str = Depends(real_me)):
+    _admin(mid)
+    if not authn.use_step_up_link(t, mid):
+        return RedirectResponse("/admin/confirm?error=" + quote("That link has expired or was already used.")
+                                + "&next=" + quote(_safe_next(next)), status_code=303)
+    _admin_on(request, mid, "email")
     return RedirectResponse(_safe_next(next), status_code=303)
 
 
@@ -715,7 +784,7 @@ def about(request: Request):
 def preview_outbox(request: Request):
     """Preview mode only: the emails the app would have sent."""
     p = DATA / "preview-outbox.jsonl"
-    if not PREVIEW:
+    if not PREVIEW or not archive.club.is_admin(request.state.real_member):
         raise HTTPException(404)
     mail = [json.loads(line) for line in p.read_text().splitlines()][::-1] if p.exists() else []
     return page(request, "outbox.html", mail=mail)
