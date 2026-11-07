@@ -84,3 +84,7 @@ nav.tabs a.on { border-color: #d9dccf; background: #fff; margin-bottom: -1px; fo
 ul.chowlist { margin: .3rem 0 1rem; }
 tr.yearrow th { text-align: left; padding-top: .9rem; font-size: 1.05rem; border-bottom: 2px solid #d9dccf; }
 form.profile input:not([type]), form.profile input[type=date] { display: block; padding: .4rem .5rem; font: inherit; font-weight: normal; margin-top: .2rem; }
+ul.business { list-style: none; padding: 0; } ul.business > li { border-bottom: 1px solid #e3e5dc; padding: .55rem 0; }
+ul.business .text { white-space: pre-wrap; } ul.business li.overdue { border-left: 3px solid #b3261e; padding-left: .6rem; }
+ul.business .late { color: #b3261e; font-weight: 600; } ul.business.done .text { color: #667; }
+ul.business form { display: inline-block; margin-top: .3rem; }

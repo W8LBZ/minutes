@@ -36,3 +36,6 @@ textarea { resize: vertical; min-height: 2.4rem; }
 .share:hover { background: #dfe7d2; } .share.ok { background: #2f3d1c; color: #fff; } .small { font-size: .85rem; }
 .chowbox { border: 1px solid #d9dccf; border-radius: .5rem; background: #f6f8f1; padding: .6rem .8rem; margin: .4rem 0 .8rem; }
 .chowbox .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: .4rem 0; } .chowbox select, .chowbox input { font: inherit; padding: .2rem; }
+.bizitem { border-bottom: 1px solid #e3e5dc; padding: .4rem 0; } .bizitem .meta { font-size: .9rem; color: #556; }
+.bizitem.done textarea { text-decoration: line-through; color: #778; } .bizitem.overdue { border-left: 3px solid #b3261e; padding-left: .5rem; }
+.bizitem select, .bizitem input[type=date] { font: inherit; padding: .15rem; }

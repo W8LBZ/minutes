@@ -50,6 +50,11 @@ def main() -> None:
         if not (d / "minutes.md").exists():
             raise SystemExit(f"No minutes for {a.date}")
         shutil.rmtree(d)
+        from . import business
+        s = business.load()
+        if n := business.forget_meeting(s, d.name):
+            print(f"Removed {n} business item(s) added at that meeting.")
+        business.save(s)
         print(f"Deleted {d}. Restart the web service so it drops it from memory.")
     elif a.cmd == "chow-import":
         from . import chow

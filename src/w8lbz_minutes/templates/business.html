@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Business{% endblock %}{% block body %}
+<h1>Business items</h1>
+<p class="muted">Club business from the meetings. Each item stays in Old Business every week until it's marked done, so nothing gets dropped.
+{% if leader %}Leaders can change any item; members can update the ones they own.{% else %}If an item is yours, you can update it or mark it done.{% endif %}</p>
+{% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+
+<h2>Open <span class="muted small">{{ open_items|length }}</span></h2>
+<ul class="business">{% for x in open_items %}{% set mine = leader or x.owner == me.id %}<li class="{{ 'overdue' if x.overdue }}">
+  <div class="text">{{ x.text }}</div>
+  <div class="meta muted small">
+    {% if x.owner %}<a href="/members/{{ x.owner }}">{{ x.owner_name }}</a>{% else %}No owner{% endif %}
+    {% if x.due %} · <span class="{{ 'late' if x.overdue }}">due {{ fmt(x.due) }}{% if x.overdue %} (overdue){% endif %}</span>{% endif %}
+    {% if x.agenda and x.agenda > today %} · on the agenda for {{ fmt(x.agenda) }}{% endif %}
+    · since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a>
+  </div>
+  {% if mine %}<details class="edit"><summary>Change</summary>
+    <form method="post" action="/business/{{ x.id }}/edit" class="profile">
+      <label>Item <textarea name="text" rows="2" required>{{ x.text }}</textarea></label>
+      {% if leader %}<label>Owner <select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == x.owner }}>{{ m.name }}</option>{% endfor %}</select></label>{% endif %}
+      <label>Due <input type="date" name="due" value="{{ x.due or '' }}"></label>
+      {% if leader %}<label>Hold for the meeting on <input type="date" name="agenda" value="{{ x.agenda or '' }}"> <span class="hint">It stays out of Old Business until that night (e.g. the President's State of the Club).</span></label>{% endif %}
+      <button class="btn small">Save</button></form>
+    <form method="post" action="/business/{{ x.id }}/done" onsubmit="return confirm('Mark this item done? It shows as done in the next minutes.')"><button class="btn small ghost">Mark done</button></form>
+  </details>{% endif %}
+</li>{% else %}<li class="muted">Nothing open.</li>{% endfor %}</ul>
+
+{% if leader %}<h2>Add an item</h2>
+<form method="post" action="/business/add" class="profile">
+  <label>Item <textarea name="text" rows="2" required placeholder="e.g. Ask the park about Field Day at Osborn Park"></textarea></label>
+  <label>Owner <select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select></label>
+  <label>Due <input type="date" name="due"></label>
+  <label>Hold for the meeting on <input type="date" name="agenda"> <span class="hint">Leave empty to bring it up at the next meeting.</span></label>
+  <button class="btn small">Add</button>
+  <p class="hint">Items added during a meeting go in from the console's New Business step instead.</p>
+</form>{% endif %}
+
+<h2>Done <span class="muted small">latest {{ done|length }}</span></h2>
+<ul class="business done">{% for x in done %}<li>
+  <div class="text">{{ x.text }}</div>
+  <div class="meta muted small">{% if x.owner %}{{ x.owner_name }} · {% endif %}done {{ fmt(x.closed) }} · since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a>
+  {% if leader or x.owner == me.id %}<form method="post" action="/business/{{ x.id }}/done" class="inline"><input type="hidden" name="done" value="0"><button class="btn small ghost">Reopen</button></form>{% endif %}</div>
+</li>{% else %}<li class="muted">Nothing yet.</li>{% endfor %}</ul>
+{% endblock %}

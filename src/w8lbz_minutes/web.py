@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import chow, console, membership, profile
+from . import business, chow, console, membership, profile
 from . import auth as authmod
 from .auth import Auth, _safe_next
 from .club import DATA, PREVIEW
@@ -208,6 +208,86 @@ def logout(request: Request):
 def account(request: Request, welcome: int = 0, next: str = "/", mid: str = Depends(me)):
     return page(request, "account.html", passkeys=authn.passkeys(mid), sessions=authn.sessions(mid),
                 welcome=welcome, next=_safe_next(next), passkey_host=request.url.hostname == authn.rp_id)
+
+
+# ---------------- tracked business items ----------------
+_business_lock = threading.Lock()
+
+
+def can_lead_now(request: Request) -> bool:
+    return archive.club.can_lead(request.state.member) or admin_mode(request)
+
+
+def business_change(request: Request, fn, meeting: str = "", back: str = "/business"):
+    """Run fn(state) under the lock, save, and refresh that meeting's draft minutes. JSON for the console."""
+    with _business_lock:
+        s = console.business_state(archive)
+        try:
+            fn(s)
+        except ValueError as e:
+            if request.headers.get("accept", "").startswith("application/json"):
+                return JSONResponse({"error": str(e)}, status_code=409)
+            return RedirectResponse(f"{back}?error=" + quote(str(e)), status_code=303)
+        business.save(s)
+        if meeting:
+            console.sync_business(archive, meeting, s)
+    if request.headers.get("accept", "").startswith("application/json"):
+        return JSONResponse(console.business_items(archive, meeting, s) if meeting else {"ok": True})
+    return RedirectResponse(back, status_code=303)
+
+
+def _may_edit_item(request: Request, s: dict, iid: str) -> None:
+    """Leaders change any item; a member can update the ones they own."""
+    if not (can_lead_now(request) or business.get(s, iid)["owner"] == request.state.member):
+        raise ValueError("Only a leader or the item's owner can change it.")
+
+
+@app.get("/business", response_class=HTMLResponse)
+def business_page(request: Request, error: str = "", mid: str = Depends(me)):
+    s = console.business_state(archive)
+    today = dt.date.today().isoformat()
+    items = [business.view(archive.club, x, today) for x in s["items"]]
+    open_ = sorted((x for x in items if x["status"] == "open"), key=lambda x: (x["due"] or "9999", x["opened"]))
+    done = sorted((x for x in items if x["status"] == "done"), key=lambda x: x["closed"], reverse=True)[:50]
+    members = sorted((m for m in archive.club.members.values() if m.status.lower() not in ("inactive", "silent key")),
+                     key=lambda m: (m.last, m.first))
+    return page(request, "business.html", open_items=open_, done=done, error=error, leader=can_lead_now(request),
+                members=members, today=today, fmt=lambda d: dt.date.fromisoformat(d).strftime("%b %-d, %Y"))
+
+
+@app.post("/business/add")
+def business_add(request: Request, text: str = Form(...), owner: str = Form(""), due: str = Form(""),
+                 agenda: str = Form(""), meeting: str = Form(""), mid: str = Depends(me)):
+    if not can_lead_now(request):
+        raise HTTPException(403, "Only leaders can add business items.")
+    return business_change(request, lambda s: business.add(s, text, mid, owner if owner in archive.club.members else None,
+                                                           due, agenda, opened=meeting or None), meeting)
+
+
+@app.post("/business/{iid}/edit")
+async def business_edit(request: Request, iid: str, mid: str = Depends(me)):
+    form = await request.form()
+    allowed = ("text", "owner", "due", "agenda") if can_lead_now(request) else ("text", "due")  # owners: text and due
+    fields = {k: form.get(k) for k in allowed if k in form}
+    if fields.get("owner") and fields["owner"] not in archive.club.members:
+        raise HTTPException(404)
+    def run(s):
+        _may_edit_item(request, s, iid)
+        business.edit(s, iid, mid, **fields)
+    return business_change(request, run, form.get("meeting", ""))
+
+
+@app.post("/business/{iid}/done")
+def business_done(request: Request, iid: str, done: int = Form(1), meeting: str = Form(""), mid: str = Depends(me)):
+    def run(s):
+        _may_edit_item(request, s, iid)
+        business.close(s, iid, mid, meeting or None) if done else business.reopen(s, iid, mid)
+    return business_change(request, run, meeting)
+
+
+@app.post("/business/{iid}/delete")
+def business_delete(request: Request, iid: str, meeting: str = Form(...), mid: str = Depends(leader)):
+    return business_change(request, lambda s: business.remove(s, iid, meeting), meeting)
 
 
 # ---------------- chow list ----------------

@@ -8,7 +8,8 @@
     "Old Business", "New Business", "Winners", "Upcoming Chow", "Upcoming Events", "Review"];
   const EMPTY_NOTE = "Leave it empty if there's nothing this week; empty sections are left out of the minutes.";
   const HINTS = {
-    "Old Business": "Carried forward from last meeting (its Old and New Business). Delete what's finished, update the rest.",
+    "Old Business": "Every business item still open, carried from meeting to meeting until it's marked done. Update the text, give it an owner or a due date, or mark it done; done items show as done in tonight's minutes, then drop off.",
+    "New Business": "Each item you add here is tracked: next week it's in Old Business, and it stays there until it's marked done.",
     "Upcoming Events": "Carried forward from last meeting. Delete past events, add new ones.",
     "Winners": "e.g. “50/50 drawing – Jim F $7.50” and “Weekly drawing – Dave G, not registered (up to $62)”.",
     "Upcoming Chow": "This section comes from the chow schedule and is updated when you submit. To change who brings chow, use the Chow page.",
@@ -233,6 +234,7 @@
   }
   function listSection(sec) {
     if (sec === "Upcoming Chow") return chowSection();
+    if (sec === "Old Business" || sec === "New Business") return businessSection(sec);
     const arr = (M.sections[sec] || []).map((i) => i.text);
     const set = (a) => { M.sections[sec] = a.map((t) => ({ text: t, member: null })); };
     const rows = itemRows(arr, set);
@@ -240,6 +242,55 @@
       arr.push("Motion: ___ moved to ___, seconded by ___. Passed."); set(arr); render(); save(); } }, "+ Motion") : null;
     const hint = [HINTS[sec], EMPTY_NOTE].filter(Boolean).join(" ");
     return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, hint), rows, motion);
+  }
+
+  // ---------- business: tracked items (business.py); every change is saved on the server at once ----------
+  function businessSection(sec) {
+    const isNew = sec === "New Business";
+    const box = h("div", {});
+    const send = async (url, data) => {
+      const r = await fetch(url, { method: "POST", headers: { Accept: "application/json" },
+        body: new URLSearchParams({ meeting: M.slug, ...data }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(j.error || j.detail || "Couldn't save"); return; }
+      D.business = j; saved.textContent = "Saved ✓"; saved.className = "saved"; draw();
+    };
+    const fmtDate = (d) => new Date(d + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const row = (x) => {
+      const done = x.status === "done";
+      const ta = h("textarea", { rows: 1, oninput: (e) => grow(e.target),
+        onchange: (e) => send(`/business/${x.id}/edit`, { text: e.target.value }) });
+      ta.value = x.text;
+      const owner = h("select", { title: "Owner", onchange: (e) => send(`/business/${x.id}/edit`, { owner: e.target.value }) },
+        h("option", { value: "" }, "No owner"),
+        D.members.map((m) => h("option", { value: m.id, selected: m.id === x.owner }, m.name)));
+      const due = h("input", { type: "date", value: x.due || "", title: "Due date",
+        onchange: (e) => send(`/business/${x.id}/edit`, { due: e.target.value }) });
+      return h("div", { class: "bizitem" + (done ? " done" : "") + (x.overdue ? " overdue" : "") },
+        h("div", { class: "row" }, ta,
+          h("button", { class: "btn small" + (done ? "" : " ghost"), title: done ? "Not done after all" : "Mark done",
+            onclick: () => send(`/business/${x.id}/done`, { done: done ? 0 : 1 }) }, done ? "✓ Done" : "Done"),
+          isNew ? h("button", { class: "btn small ghost", title: "Delete (added by mistake)",
+            onclick: () => { if (confirm("Delete this item?")) send(`/business/${x.id}/delete`, {}); } }, "✕") : null),
+        h("div", { class: "row meta" }, owner, " due ", due,
+          x.overdue ? h("span", { class: "badge warn" }, `overdue since ${fmtDate(x.due)}`) : null,
+          !isNew ? h("span", { class: "hint" }, ` since ${fmtDate(x.opened)}`) : null));
+    };
+    const add = () => {
+      const ta = h("textarea", { rows: 1, placeholder: isNew ? "New item…" : "", oninput: (e) => grow(e.target) });
+      const go = () => { if (ta.value.trim()) send("/business/add", { text: ta.value }); };
+      return h("div", {}, h("div", { class: "row" }, ta, h("button", { class: "btn small", onclick: go }, "+ Add item")),
+        h("button", { class: "btn small ghost", onclick: () => { ta.value = "Motion: ___ moved to ___, seconded by ___. Passed."; ta.focus(); grow(ta); } }, "+ Motion"));
+    };
+    const draw = () => {
+      const items = isNew ? D.business.new : D.business.old;
+      box.replaceChildren(
+        ...(items.length ? items.map(row) : [h("p", { class: "muted" }, isNew ? "Nothing new yet." : "No open items.")]),
+        isNew ? add() : h("p", { class: "hint" }, "New items go in New Business. ", h("a", { href: "/business", target: "_blank" }, "All business items")));
+      setTimeout(() => box.querySelectorAll("textarea").forEach(grow), 0);
+    };
+    draw();
+    return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, HINTS[sec]), box);
   }
 
   // ---------- chow: did tonight's member bring it? The rest is read-only, from the chow schedule. ----------
