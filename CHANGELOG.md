@@ -4,6 +4,11 @@ What changed in each version of W8LBZ Minutes. Planned work is in [ROADMAP.md](R
 
 Versions follow [semantic versioning](https://semver.org): while the app is 0.x, the middle number goes up for new features and the last for fixes. Each version is a git tag (`v0.2.0`), and the app's footer shows the version that's running.
 
+## Unreleased
+- **Light and dark themes:** the app follows your device, or pick Auto, Light or Dark under your name. Printed minutes stay black on white.
+- **A more modern look:** striped, rounded tables (archive, roster, stats, guests), a top bar that shows where you are, and tidier buttons, fields, tabs and sign-in page.
+- **Profile pictures:** add one on Your profile; it shows next to your name in the menu, on the roster, on your member page and on business items and comments. Members only; camera details and location are removed. Without one, your initials are shown.
+
 ## 0.6.0 (2026-11-07)
 - **Chow pages are easier to read:** the schedule, past nights and rotation are tidy striped lists with date blocks, your own night highlighted, chips for what happened and for each member's limits, and buttons that open a small panel right under the row. Names are picked by typing, as on the Business page.
 - **Skip someone's next turn** (chow limits): when a member covered a turn early, the next Fill passes over them once, with no make-up night owed.

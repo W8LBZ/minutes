@@ -279,3 +279,16 @@ ol.nights > li.none .dateblk { opacity: .55; } ol.nights > li.tonight { box-shad
 section.suggestions { border: 1px solid var(--ai); background: var(--ai-soft); border-radius: var(--radius); padding: .3rem 1rem .8rem; margin: 1rem 0 1.5rem; }
 .sugg { border-bottom: 1px solid var(--border); padding: .5rem 0; } .sugg form { display: inline-block; vertical-align: bottom; }
 nav.top .drop .ico { display: inline-block; width: 1.3rem; }
+/* profile pictures (avatars.py, _avatar.html) */
+.avatar { display: inline-grid; place-items: center; border-radius: 50%; object-fit: cover; flex-shrink: 0; vertical-align: middle;
+  background: var(--surface-3); color: #fff; font-weight: 600; overflow: hidden; }
+.avatar.initials { background: hsl(var(--h) 38% 42%); letter-spacing: .02em; }
+.avatar.xs { width: 1.15rem; height: 1.15rem; font-size: .55rem; margin-right: .1rem; }
+.avatar.sm { width: 1.75rem; height: 1.75rem; font-size: .72rem; }
+.avatar.md { width: 1.5rem; height: 1.5rem; font-size: .62rem; margin-right: .4rem; }
+.avatar.xl { width: 5.5rem; height: 5.5rem; font-size: 1.9rem; box-shadow: var(--shadow); }
+nav.top .me { display: inline-flex; align-items: center; padding-left: .3rem; }
+a.withavatar { display: inline-flex; align-items: center; gap: .55rem; }
+.memberhead { display: flex; gap: 1.1rem; align-items: center; margin-bottom: .6rem; } .memberhead h1 { margin: 0 0 .2rem; }
+.photorow { display: flex; gap: 1.1rem; align-items: center; max-width: 36rem; margin: .4rem 0 1rem; }
+.photorow p.hint { margin: .4rem 0 0; } .photoform { display: inline; } label.filebtn { cursor: pointer; }

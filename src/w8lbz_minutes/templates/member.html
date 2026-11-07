@@ -1,7 +1,9 @@
-{% extends "base.html" %}{% from "_lock.html" import lock %}{% block body %}
-<h1>{{ member.name or member.last }}{% if member.callsign %} <span class="cs">{{ member.callsign }}</span>{% endif %}</h1>
+{% extends "base.html" %}{% from "_avatar.html" import avatar %}{% from "_lock.html" import lock %}{% block body %}
+<div class="memberhead">{{ avatar(member.id, 'xl') }}
+<div><h1>{{ member.name or member.last }}{% if member.callsign %} <span class="cs">{{ member.callsign }}</span>{% endif %}</h1>
 {% if request.query_params.get('added') %}<p class="msg ok">Added to the roster. They've joined the chow rotation at the end of the current round, so everyone else takes a turn first.</p>{% endif %}
-<p class="muted">{{ [member.license_class, member.role, member.status if member.status != 'Active']|select|join(' · ') }}</p>
+<p class="muted">{{ [member.license_class, member.role, member.status if member.status != 'Active']|select|join(' · ') }}</p></div></div>
+{% if is_officer_or_admin and avatar_url(member.id) and member.id != me.id %}<form method="post" action="/members/{{ member.id }}/photo/remove" class="inline" onsubmit="return confirm('Remove {{ member.first }}\'s picture?')"><button class="linkbtn">Remove picture</button></form>{% endif %}
 {% if can_view_as %}<form method="post" action="/admin/view-as"><input type="hidden" name="member" value="{{ member.id }}"><input type="hidden" name="next" value="/">
   <button class="btn small ghost" type="submit" title="See the app exactly as {{ member.first }} does, read-only (admin mode)">View the app as {{ member.first }}</button></form>{% endif %}
 

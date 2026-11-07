@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% import "_pager.html" as pager %}{% block title %}Roster{% endblock %}{% block body %}
+{% extends "base.html" %}{% from "_avatar.html" import avatar %}{% import "_pager.html" as pager %}{% block title %}Roster{% endblock %}{% block body %}
 <div class="headrow"><h1>Roster</h1>
 <p>{% if can_add %}<a class="btn small" href="/roster/add">Add a member</a> · {% endif %}<a href="/profile">Edit your details and what you share</a>{% if is_officer %} · <a href="/roster/changes">Recent changes</a>{% endif %}</p></div>
 <p class="muted">{{ active }} active members. From the club roster sheet, synced daily. Click a name for contact details{% if not is_officer %} the member has shared{% endif %} and their meeting history.</p>
@@ -7,7 +7,7 @@
 </select></label> {{ pager.size(pg) }}<noscript><button class="btn small">Show</button></noscript></form>
 <table class="list"><thead><tr><th>Name</th><th>Callsign</th><th>License</th><th>Office</th><th>Status</th><th>Member since</th></tr></thead>
 <tbody>{% for m, since in pg.rows %}<tr>
-<td data-sort="{{ m.last|lower }} {{ m.first|lower }}"><a href="/members/{{ m.id }}">{{ m.name }}</a></td><td class="cs">{{ m.callsign or '' }}</td>
+<td data-sort="{{ m.last|lower }} {{ m.first|lower }}"><a href="/members/{{ m.id }}" class="withavatar">{{ avatar(m.id, 'sm') }}{{ m.name }}</a></td><td class="cs">{{ m.callsign or '' }}</td>
 <td>{{ m.license_class or '' }}</td><td>{{ m.role or '' }}</td>
 <td>{% if m.status != 'Active' %}<span class="badge">{{ m.status }}</span>{% else %}Active{% endif %}</td>
 <td data-sort="{{ since or '' }}">{{ since|listdate if since }}</td>

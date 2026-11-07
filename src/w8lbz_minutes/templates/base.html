@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% from "_avatar.html" import avatar %}<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}W8LBZ Minutes{% endblock %}</title>
 <script>/* theme before first paint: "light", "dark", or follow the device */
@@ -11,7 +11,7 @@ try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark"
   {% if me %}{% set here = request.url.path %}
   {% for href, label in (('/', 'Archive'), ('/roster', 'Roster'), ('/stats', 'Stats'), ('/business', 'Business'), ('/chow', 'Chow'), ('/guests', 'Guests'), ('/links', 'Links')) + ((('/console', 'Lead a meeting'),) if can_lead else ()) %}<a href="{{ href }}" class="{{ 'on' if (here == href or (href != '/' and here.startswith(href)) or (href == '/' and here.startswith('/meetings'))) }}">{{ label }}</a>{% endfor %}
   <form action="/search"><input name="q" type="search" placeholder="Search all minutes…" value="{{ q or '' }}"></form>
-  <details class="menu"><summary class="me">{{ me.short or me.first }} ▾</summary>
+  <details class="menu"><summary class="me">{{ avatar(me.id, 'md') }}{{ me.short or me.first }} ▾</summary>
     <div class="drop"><a href="/profile">Your profile</a><a href="/about">About</a>{% if is_admin and admin_until %}<a href="/admin/email">Email log</a><a href="/admin/updates">Updates{% if update_available %} <span class="badge">{{ update_available }}</span>{% endif %}</a>{% endif %}
     {% if is_admin %}<form method="post" action="/admin/mode"><input type="hidden" name="on" value="{{ 0 if admin_until else 1 }}"><input type="hidden" name="next" value="{{ request.url.path }}">
       <button type="submit"><span class="ico">🛡️</span>{{ 'Turn off admin mode' if admin_until else 'Turn on admin mode' }}</button></form>{% endif %}

@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}Your profile{% endblock %}{% block body %}
+{% extends "base.html" %}{% from "_avatar.html" import avatar %}{% block title %}Your profile{% endblock %}{% block body %}
 <h1>Your profile</h1>
 {% include "_profile_tabs.html" %}
 <p class="muted">{{ m.name }}{% if m.callsign %} · {{ m.callsign }}{% endif %}{% if m.license_class %} · {{ m.license_class }}{% endif %}.
@@ -6,6 +6,19 @@ Your name, callsign and license class are kept by the Secretary; ask an officer 
 {% if saved and not error %}<p class="msg ok">Saved. The club roster is updated.</p>{% endif %}
 {% if email_sent %}<p class="msg ok">We sent a confirmation link to <b>{{ email_sent }}</b>. Your email changes once you open it.</p>{% endif %}
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+
+{% if photo %}<p class="msg ok">Picture saved.</p>{% endif %}
+<div class="photorow card">
+  {{ avatar(m.id, 'xl') }}
+  <div>
+    <form method="post" action="/profile/photo" enctype="multipart/form-data" class="photoform">
+      <label class="btn small ghost filebtn">{{ 'Change picture' if avatar_url(m.id) else 'Add a picture' }}
+        <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" onchange="this.form.submit()" hidden></label>
+    </form>
+    {% if avatar_url(m.id) %}<form method="post" action="/profile/photo/remove" class="inline"><button class="linkbtn">Remove</button></form>{% endif %}
+    <p class="hint">Members see it next to your name. It's cropped to a square; camera details and location are removed.</p>
+  </div>
+</div>
 
 <form method="post" action="/profile" class="profile">
   <label>Email <input type="email" name="email" value="{{ m.email or '' }}" autocomplete="email">
