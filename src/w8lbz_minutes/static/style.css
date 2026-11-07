@@ -318,3 +318,5 @@ nav.top .me .dot { display: inline-block; width: .55rem; height: .55rem; border-
 .updbar { background: var(--info-soft); color: var(--text); border-bottom: 1px solid var(--border); padding: .45rem 1rem; font-size: .9rem; text-align: center; }
 nav.top .drop a.updnote { background: var(--warn-soft); color: var(--warn-text); font-weight: 600; margin-bottom: .2rem; }
 nav.top .drop a.updnote small { display: block; font-weight: normal; font-size: .78rem; }
+div.relnotes { background: var(--surface-2); border-radius: var(--radius-sm); padding: .3rem 1rem; margin: .4rem 0; max-height: 22rem; overflow-y: auto; font-size: .93rem; }
+div.relnotes ul { padding-left: 1.2rem; margin: .5rem 0; } div.relnotes li { margin: .3rem 0; } div.relnotes p { margin: .5rem 0; }

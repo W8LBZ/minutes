@@ -78,6 +78,13 @@ def _initials(mid: str | None) -> str:
 
 
 templates.env.globals.update(avatar_url=avatars.url, avatar_hue=avatars.hue, initials=_initials)
+def _md(text: str | None) -> Markup:
+    """Markdown to HTML for release notes (from our own CHANGELOG via GitHub). Raw HTML is escaped first."""
+    import markdown
+    return Markup(markdown.markdown((text or "").replace("&", "&amp;").replace("<", "&lt;")))
+
+
+templates.env.filters["md"] = _md
 templates.env.filters["isodate"] = lambda d: dt.date.fromisoformat(d)
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 def _assets_stamp() -> str:

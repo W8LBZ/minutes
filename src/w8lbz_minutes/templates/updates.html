@@ -22,7 +22,7 @@
     {% if newer.deploy_notes %}<div class="msg err"><b>This release needs steps by hand.</b> Do these on CT103 first:
       <ul>{% for n in newer.deploy_notes %}<li>{{ n }}</li>{% endfor %}</ul>
       <label class="wk"><input type="checkbox" name="notes_done" value="1" required> I've done these steps</label></div>{% endif %}
-    <details><summary class="muted">What's in it</summary><pre class="relnotes">{{ newer.notes }}</pre></details>
+    <details open><summary class="muted">What's in it</summary><div class="relnotes changelog">{{ newer.notes|md }}</div></details>
     <div class="formrow"><button class="btn" onclick="return confirm('Update the app to {{ newer.version }} now? It restarts, so anyone using it is interrupted for a moment.')">Update now</button></div>
     <p class="hint">Runs the same update as <code>update.sh</code> on the server: the latest main from GitHub, then a restart. Avoid doing it during a meeting.</p>
   </form>

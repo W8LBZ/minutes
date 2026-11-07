@@ -78,6 +78,7 @@ def test_admin_page(env, tmp_path, monkeypatch):
     a.set_admin(token, 60)
     page = c.get("/admin/updates").text
     assert "Version 0.7.0" in page and "copy business.json" in page and "I've done these steps" in page
+    assert "<strong>Business items are tracked</strong>" in page and "<li>" in page            # the notes are rendered
     assert "Version 0.7.0 is available" in c.get("/links").text                  # the admin banner says so
     assert "needs the steps" in c.post("/admin/updates/run", data={"target": "0.7.0"}).text
     c.post("/admin/updates/run", data={"target": "0.7.0", "notes_done": 1})
