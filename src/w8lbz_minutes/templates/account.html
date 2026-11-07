@@ -1,5 +1,6 @@
-{% extends "base.html" %}{% block title %}Your account{% endblock %}{% block body %}
-<h1>{{ me.name }}{% if me.callsign %} <span class="cs">{{ me.callsign }}</span>{% endif %}</h1>
+{% extends "base.html" %}{% block title %}Sign-in & passkeys{% endblock %}{% block body %}
+<h1>Your profile</h1>
+{% include "_profile_tabs.html" %}
 {% if welcome %}<div class="msg ok">
   <b>You're signed in.</b> Add a passkey so next time you can sign in with your fingerprint, face or device PIN, with no email needed.
   <a href="{{ next }}">Skip for now</a>
