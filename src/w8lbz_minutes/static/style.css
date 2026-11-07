@@ -307,3 +307,8 @@ form.filter { width: 100%; }
 .membercard .avatar.lg { width: 4.5rem; height: 4.5rem; font-size: 1.5rem; margin-bottom: .3rem; }
 .mc-name { font-weight: 600; font-size: 1.05rem; } .mc-call { color: var(--muted); font-size: .88rem; }
 .mc-meta { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: center; margin: .2rem 0; }
+form.profile fieldset.fixed { background: var(--surface-2); }
+form.profile .fixedrow { display: flex; flex-wrap: wrap; gap: .8rem; }
+form.profile .fixedrow label { flex: 1 1 9rem; margin: .2rem 0 .5rem; font-weight: 600; font-size: .9rem; }
+form.profile input[readonly] { width: 100%; background: var(--surface-3); color: var(--muted); border-style: dashed; cursor: default; }
+form.profile input[readonly]:focus { box-shadow: none; border-color: var(--border-strong); }

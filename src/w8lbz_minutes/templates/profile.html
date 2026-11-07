@@ -1,8 +1,6 @@
 {% extends "base.html" %}{% from "_avatar.html" import avatar %}{% block title %}Your profile{% endblock %}{% block body %}
 <h1>Your profile</h1>
 {% include "_profile_tabs.html" %}
-<p class="muted">{{ m.name }}{% if m.callsign %} · {{ m.callsign }}{% endif %}{% if m.license_class %} · {{ m.license_class }}{% endif %}.
-Your name, callsign and license class are kept by the Secretary; ask an officer to change them.</p>
 {% if saved and not error %}<p class="msg ok">Saved. The club roster is updated.</p>{% endif %}
 {% if email_sent %}<p class="msg ok">We sent a confirmation link to <b>{{ email_sent }}</b>. Your email changes once you open it.</p>{% endif %}
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
@@ -21,6 +19,14 @@ Your name, callsign and license class are kept by the Secretary; ask an officer 
 </div>
 
 <form method="post" action="/profile" class="profile">
+  <fieldset class="fixed"><legend>From the club roster</legend>
+    <div class="fixedrow">
+      <label>Name <input value="{{ m.name }}" readonly tabindex="-1"></label>
+      <label>Callsign <input value="{{ m.callsign or '' }}" readonly tabindex="-1" class="cs"></label>
+      <label>License class <input value="{{ m.license_class or '' }}" readonly tabindex="-1"></label>
+    </div>
+    <span class="hint">🔒 The Secretary keeps these on the roster. To change one, ask an officer.</span>
+  </fieldset>
   <label>Email <input type="email" name="email" value="{{ m.email or '' }}" autocomplete="email">
     <span class="hint">Also how you sign in. A change takes effect after you confirm it from the new address.</span></label>
   <label>Phone <input type="tel" name="phone" value="{{ m.phone or '' }}" maxlength="40" autocomplete="tel"></label>
