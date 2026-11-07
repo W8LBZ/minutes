@@ -116,3 +116,7 @@ form.modern textarea { width: 100%; box-sizing: border-box; min-height: 5.5rem; 
 form.modern textarea:focus, form.modern input:focus, form.modern select:focus { outline: none; border-color: #5b7a2f; box-shadow: 0 0 0 3px rgba(91, 122, 47, .18); }
 form.modern .formrow { display: flex; flex-wrap: wrap; gap: .8rem; align-items: flex-end; margin-top: .4rem; }
 form.modern .formrow label { margin: 0; } form.modern .hint { font-weight: normal; }
+.card-head { display: flex; gap: .8rem; align-items: flex-start; justify-content: space-between; }
+.topacts { display: flex; gap: .35rem; flex-shrink: 0; } .topacts form { margin: 0; display: inline; }
+.topacts button.act { font-size: .82rem; padding: .2rem .65rem; }
+@media (max-width: 560px) { .card-head { flex-direction: column; } }
