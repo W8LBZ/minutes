@@ -83,3 +83,4 @@ nav.tabs a { padding: .35rem .8rem; border: 1px solid transparent; border-bottom
 nav.tabs a.on { border-color: #d9dccf; background: #fff; margin-bottom: -1px; font-weight: 600; }
 ul.chowlist { margin: .3rem 0 1rem; }
 tr.yearrow th { text-align: left; padding-top: .9rem; font-size: 1.05rem; border-bottom: 2px solid #d9dccf; }
+form.profile input:not([type]), form.profile input[type=date] { display: block; padding: .4rem .5rem; font: inherit; font-weight: normal; margin-top: .2rem; }

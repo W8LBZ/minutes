@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import chow, console, profile
+from . import chow, console, membership, profile
 from .auth import Auth, _safe_next
 from .club import DATA, PREVIEW
 from .roster import SHAREABLE, SheetError
@@ -426,6 +426,36 @@ def profile_email_confirm(request: Request, t: str = "", mid: str = Depends(me))
     return RedirectResponse("/profile?saved=1", status_code=303)
 
 
+def roster_keeper(request: Request) -> str:
+    """Adding members: the offices in roster_keepers (Secretary and Treasurer by default), or admin mode."""
+    if not (archive.club.keeps_roster(request.state.member) or admin_mode(request)):
+        raise HTTPException(403, "Only the Secretary or Treasurer can add members.")
+    return request.state.member
+
+
+@app.get("/roster/add", response_class=HTMLResponse)
+def roster_add_form(request: Request, guest: str = "", error: str = "", mid: str = Depends(roster_keeper)):
+    ready = membership.ready_guests(archive.guests(), int(archive.club.info.get("invite_after_visits", 3)))
+    g = next((x for x in ready if x["name"] == guest), None)
+    first, last = membership.split_name(g["name"]) if g else ("", "")
+    f = {"first": first, "last": last, "callsign": (g or {}).get("callsign") or ""}
+    return page(request, "roster_add.html", ready=ready, guest=g, f=f, error=error, classes=membership.CLASSES,
+                today=dt.date.today().isoformat(), invite_after=archive.club.info.get("invite_after_visits", 3))
+
+
+@app.post("/roster/add", response_class=HTMLResponse)
+async def roster_add(request: Request, mid: str = Depends(roster_keeper)):
+    form = dict(await request.form())
+    try:
+        new = membership.add_member(archive.club, form, mid, url=base_url(request))
+    except (ValueError, SheetError) as e:
+        ready = membership.ready_guests(archive.guests(), int(archive.club.info.get("invite_after_visits", 3)))
+        return page(request, "roster_add.html", ready=ready, guest=None, f=form, error=str(e),
+                    classes=membership.CLASSES, today=dt.date.today().isoformat(),
+                    invite_after=archive.club.info.get("invite_after_visits", 3))
+    return RedirectResponse(f"/members/{new}?added=1", status_code=303)
+
+
 @app.get("/roster/changes", response_class=HTMLResponse)
 def roster_changes(request: Request, error: str = "", mid: str = Depends(officer)):
     return page(request, "changes.html", changes=profile.history(), labels=profile.LABELS, error=error)
@@ -610,7 +640,8 @@ def roster(request: Request, status: str = "Active", p: str = Query("1", alias="
     shown = [m for m in ms if status == "all" or m.status == status]
     return page(request, "roster.html", pg=paginate([(m, since(m)) for m in shown], p, per, 50),
                 active=sum(m.status.lower() not in gone for m in ms), statuses=statuses, status=status,
-                is_officer=privileged(request))
+                is_officer=privileged(request),
+                can_add=archive.club.keeps_roster(request.state.member) or admin_mode(request))
 
 
 @app.get("/bylaws", response_class=HTMLResponse)

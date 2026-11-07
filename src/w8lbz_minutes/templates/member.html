@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% from "_lock.html" import lock %}{% block body %}
 <h1>{{ member.name or member.last }}{% if member.callsign %} <span class="cs">{{ member.callsign }}</span>{% endif %}</h1>
+{% if request.query_params.get('added') %}<p class="msg ok">Added to the roster. They'll be under "Not in the rotation yet" on the Chow page's Rotation tab.</p>{% endif %}
 <p class="muted">{{ [member.license_class, member.role, member.status if member.status != 'Active']|select|join(' · ') }}</p>
 {% if can_view_as %}<form method="post" action="/admin/view-as"><input type="hidden" name="member" value="{{ member.id }}"><input type="hidden" name="next" value="/">
   <button class="btn small ghost" type="submit" title="See the app exactly as {{ member.first }} does, read-only (admin mode)">View the app as {{ member.first }}</button></form>{% endif %}

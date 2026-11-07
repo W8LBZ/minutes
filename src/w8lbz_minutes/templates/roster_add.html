@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}Add a member{% endblock %}{% block body %}
+<h1>Add a member</h1>
+<p class="muted">Adds a row to the club roster sheet and a "Joined" row to its Membership Log, and the new member shows up in the app right away. The Secretary gets an email. Their sharing choices start off: they set those on their own profile.</p>
+{% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+
+{% if ready %}<h2>Guests ready to join</h2>
+<p class="hint">Guests who aren't on the roster and have come {{ invite_after }} or more times. Pick one to fill in what we know.</p>
+<ul class="results">{% for g in ready %}<li><a href="/roster/add?guest={{ g.name|urlencode }}">{{ g.name }}</a>{% if g.callsign %} <span class="cs">{{ g.callsign }}</span>{% endif %}
+  <span class="muted small">{{ g.visits|length }} visits, last {{ g.visits[-1][0]|listdate }}</span>{% if guest and guest.name == g.name %} <span class="badge">filled in below</span>{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+
+<h2>New member</h2>
+<form method="post" action="/roster/add" class="profile">
+  <label>First name <input name="first" value="{{ f.first or '' }}" required></label>
+  <label>Last name <input name="last" value="{{ f.last or '' }}" required></label>
+  <label>Callsign <input name="callsign" value="{{ f.callsign or '' }}" size="8" placeholder="if licensed"></label>
+  <label>License class <select name="license_class"><option value="">(none or not known)</option>{% for c in classes %}<option {{ 'selected' if f.license_class == c }}>{{ c }}</option>{% endfor %}</select></label>
+  <label>Email <input name="email" type="email" value="{{ f.email or '' }}"></label>
+  <label>Phone <input name="phone" type="tel" value="{{ f.phone or '' }}"></label>
+  <label>Address <textarea name="address" rows="2">{{ f.address or '' }}</textarea></label>
+  <label>Joined <input name="joined" type="date" value="{{ f.joined or today }}"></label>
+  <p><button class="btn">Add to the roster</button> <a href="/roster">Cancel</a></p>
+</form>
+{% endblock %}

@@ -67,6 +67,8 @@ class Club:
         self.email = cfg.get("email") or {}
         self.redact = [_n(x) for x in (cfg.get("privacy") or {}).get("never_record", [])]
         self.admins = {str(x).lower() for x in cfg.get("admins") or []}  # may turn on admin mode (callsign ids)
+        # Offices whose holders add new members to the roster (bylaws IV.C: the Secretary keeps it).
+        self.roster_keepers = [str(x).lower() for x in cfg.get("roster_keepers") or ["Secretary", "Treasurer"]]
 
         self._mtime = None  # set when the people come from the roster cache, so refresh() can notice a sync
         if roster is None and "members" in cfg:  # inline members (tests, example config)
@@ -143,6 +145,10 @@ class Club:
         """Contact details: officers, admins in admin mode, and the member always; others only what was shared."""
         v, m = self.members.get(viewer or ""), self.members.get(mid)
         return bool(m and v and (v.officer or elevated or v.id == m.id or fld in m.share))
+
+    def keeps_roster(self, mid: str | None) -> bool:
+        m = self.members.get(mid or "")
+        return bool(m and m.role and any(k in m.role.lower() for k in self.roster_keepers))
 
     @property
     def secretaries(self) -> list[str]:

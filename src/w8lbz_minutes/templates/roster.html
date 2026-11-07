@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% import "_pager.html" as pager %}{% block title %}Roster{% endblock %}{% block body %}
 <div class="headrow"><h1>Roster</h1>
-<p><a href="/profile">Edit your details and what you share</a>{% if is_officer %} · <a href="/roster/changes">Recent changes</a>{% endif %}</p></div>
+<p>{% if can_add %}<a class="btn small" href="/roster/add">Add a member</a> · {% endif %}<a href="/profile">Edit your details and what you share</a>{% if is_officer %} · <a href="/roster/changes">Recent changes</a>{% endif %}</p></div>
 <p class="muted">{{ active }} active members. From the club roster sheet, synced daily. Click a name for contact details{% if not is_officer %} the member has shared{% endif %} and their meeting history.</p>
 <form class="filter"><label>Status <select name="status" onchange="this.form.submit()">
   {% for st in statuses %}<option {{ 'selected' if st == status }}>{{ st }}</option>{% endfor %}<option value="all" {{ 'selected' if status == 'all' }}>Everyone</option>
