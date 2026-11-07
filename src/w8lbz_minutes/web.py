@@ -282,11 +282,16 @@ def run_followups(slug: str) -> str:
 
 
 def followups_after_submit(slug: str) -> None:
+    """After Submit: AI follow-up suggestions, and fresh "ask about" prompts for next week's reports."""
     if ai.configured(archive.club):
         try:
             run_followups(slug)
         except Exception:
             _log.exception("AI follow-ups for %s failed", slug)
+        try:
+            console.refresh_ask_about(archive)
+        except Exception:
+            _log.exception("AI ask-about prompts after %s failed", slug)
 
 
 @app.post("/business/suggest")

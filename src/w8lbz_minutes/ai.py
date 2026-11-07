@@ -147,3 +147,38 @@ def suggest_followups(club: Club, m: Meeting, open_items: list[dict], post=None)
         out.append({"kind": kind, "item": x.get("item") if kind == "update" else None, "text": text,
                     "owner": owner, "due": due, "why": " ".join(str(x.get("why") or "").split())[:300]})
     return out
+
+
+# ---------------- "ask about" prompts for Community Reports ----------------
+
+SYSTEM_ASK = """You help the leader of a small amateur radio club's weekly meeting. During community reports each member says what they've been doing on the radio, and the leader likes to follow up on what they said before.
+
+For each member you get their recent reports, oldest first. Give at most two short prompts for the leader: things worth asking about now, such as a project they were building, a plan or trip they mentioned, a problem they were fixing, an event or contest they were going to, or a license exam they were studying for.
+
+Rules:
+- Leave out routine or finished things ("nothing new", "worked some stations", something they already said was done) and anything a later report already settled.
+- Each prompt is under 12 words and starts with a verb, e.g. "Ask how the 40 m dipole build went." Use the member's own subject words; never invent details.
+- An empty list is the right answer when nothing needs a follow-up.
+
+Answer with JSON only: {"members": {"<member id>": ["...", "..."]}}, including every member id you were given."""
+
+MAX_ASK = 2
+
+
+def ask_about(club: Club, histories: dict[str, list[tuple[str, str]]], post=None) -> dict[str, list[str]]:
+    """histories: member id -> [(date, report text)], oldest first. Returns id -> up to two prompts."""
+    lines = []
+    for mid, reports in histories.items():
+        kept = [(d, t) for d, t in reports if not club.is_redacted(t)]
+        if not kept or mid not in club.members:
+            continue
+        lines += [f"### {mid} ({club.members[mid].name})", *[f"- {d}: {t}" for d, t in kept], ""]
+    if not lines:
+        return {}
+    reply = _json(complete(club, SYSTEM_ASK, "\n".join(lines), "ask-about", post))
+    out = {}
+    for mid, prompts in (reply.get("members") or {}).items():
+        if mid in histories and isinstance(prompts, list):
+            out[mid] = [" ".join(str(p).split())[:120] for p in prompts if str(p).strip()
+                        and not club.is_redacted(str(p))][:MAX_ASK]
+    return out

@@ -13,6 +13,8 @@ Versions follow [semantic versioning](https://semver.org): while the app is 0.x,
 - **Comments on business items:** any member can add an update, a question or an offer to help; new comments show under the item in the console's Old Business. Each item's **History** shows every change (old and new wording, owner, dates) and the meeting it was made at. Submitted minutes keep the wording they had.
 - **Notes for the next meeting:** on the Business page, a member can leave a note for an upcoming meeting (e.g. "I can't make the 12th; since last meeting I…"). The leader sees it in Community Reports and adds it to the reports with one click.
 
+- **"Ask about" prompts (AI, optional):** in Community Reports, instead of a member's last three reports word for word, the leader sees one or two short prompts like "Ask how the 40 m dipole build went", made from those reports after each meeting. Routine and finished things are left out; what they actually said is one click away.
+
 ## 0.4.0 (2026-11-06)
 - **Sign-in & passkeys** is now a tab of Your profile, which tidies the menu under your name.
 - **Add a member** from the Roster page (Secretary or Treasurer). It writes a new row on the roster sheet and a "Joined" row on its Membership Log (values only), and the member shows up at once, at the end of the current chow round. Guests who've come often enough to be invited are listed, and picking one fills in their name and callsign. A callsign and license class are required. The Secretary gets an email, and Recent changes shows who added them.

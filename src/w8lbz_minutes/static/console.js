@@ -183,6 +183,18 @@
     if (!r.ok) { alert(j.error || j.detail || "Couldn't save"); return; }
     D.business = j; render(); save();
   }
+  // What to ask a member about: the AI's short prompts when there are any, with what they actually said one click away.
+  function followUp(k, past) {
+    if (k.startsWith("g:")) return h("p", { class: "hint" }, "Guest: ask what brought them in, and their license and callsign.");
+    if (!past.length) return h("p", { class: "hint" }, "No earlier reports on record.");
+    const said = past.map(([d, t]) => h("div", { class: "past" }, h("b", {}, d + ": "), t));
+    const asks = (D.ask_about || {})[k];
+    if (!asks) return h("div", {}, h("div", { class: "hint" }, "Follow up on what they said before:"), said);
+    return h("div", { class: "askabout" },
+      h("div", { class: "hint" }, asks.length ? "Ask about " : "Nothing from earlier reports needs a follow-up ", h("span", { class: "badge ai" }, "AI")),
+      asks.length ? h("ul", {}, asks.map((a) => h("li", {}, a))) : null,
+      h("details", {}, h("summary", { class: "hint" }, "What they said before"), said));
+  }
   function reports() {
     const rem = remaining();
     const groups = [["Online", rem.filter((k) => M.remote.includes(k))], ["In person", rem.filter((k) => M.in_person.includes(k))],
@@ -208,8 +220,7 @@
         k.startsWith("g:") && inviteDue(M.guests.find((g) => "g:" + g.name === k) || { name: k.slice(2) })
           ? h("div", { class: "invitebox" }, `This is ${k.slice(2).split(" ")[0]}'s ${ordinal(visitNo(M.guests.find((g) => "g:" + g.name === k)))} visit. ${INVITE}.`) : null,
         (D.business.notes || []).filter((n) => n.by === k).map((n) => h("div", { class: "bizcomment" }, h("b", {}, "They sent a note: "), n.text)),
-        past.length ? h("div", {}, h("div", { class: "hint" }, "Follow up on what they said before:"),
-          past.map(([d, t]) => h("div", { class: "past" }, h("b", {}, d + ": "), t))) : h("p", { class: "hint" }, k.startsWith("g:") ? "Guest: ask what brought them in, and their license and callsign." : "No earlier reports on record."),
+        followUp(k, past),
         ta,
         h("div", { class: "row" },
           h("button", { class: "btn", onclick: () => finish(false) }, "Done"),

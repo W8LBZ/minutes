@@ -115,3 +115,35 @@ def test_business_page_suggestions_for_leaders_only(env, monkeypatch, tmp_path):
     sid = business.load()["suggestions"][0]["id"]
     c.post(f"/business/suggestions/{sid}/accept", data={"text": "Call the park about Field Day", "owner": "amy", "due": ""})
     assert [x["text"] for x in business.load()["items"]][-1] == "Call the park about Field Day"
+
+
+def test_ask_about_prompts(env, monkeypatch, tmp_path):
+    from w8lbz_minutes import console
+    from w8lbz_minutes.store import Archive
+    club, _, _ = env
+    sent = {}
+
+    def post(url, json, timeout, headers):
+        sent["user"] = json["messages"][1]["content"]
+        return Reply(__import__("json").dumps({"members": {
+            "amy": ["Ask how the 40 m dipole build went.", "Ask about the VE exam.", "a third one is dropped"],
+            "sec": [], "stranger": ["not a member we asked about"]}}))
+    meetings = tmp_path / "meetings"
+    for d, text in (("2026-10-22", "Amy started building a 40 m dipole"), ("2026-10-29", "Amy is studying for General"),
+                    ("2026-11-05", "Amy talked to Secret Name on 2 m")):
+        Meeting(date=dt.date.fromisoformat(d), status="published",
+                sections={"Community Reports": [Item(text, "amy"), Item("Sam: nothing new", "sec")]}).save(meetings)
+    a = Archive(meetings, club)
+    monkeypatch.setattr(console, "DATA", tmp_path)
+    monkeypatch.setattr(ai, "complete", lambda club, system, user, purpose, post_=None: post(None, {"messages": [{}, {"content": user}]}, 0, {}).text)
+    assert console.refresh_ask_about(a) == 2
+    assert "40 m dipole" in sent["user"] and "Secret Name" not in sent["user"]       # never-record line not sent
+    m = console.start(a, dt.date(2026, 11, 12), "sec")
+    asks = console.context(a, m)["ask_about"]
+    assert asks == {"amy": ["Ask how the 40 m dipole build went.", "Ask about the VE exam."], "sec": []}
+    # A newer report makes the saved prompts stale: the console falls back to what they said.
+    console.submit(a, m.slug)
+    a.by_slug[m.slug].sections["Community Reports"] = [Item("Amy finished the dipole", "amy")]
+    a.by_slug[m.slug].save(meetings)
+    a.reload()
+    assert "amy" not in console.context(a, console.start(a, dt.date(2026, 11, 19), "sec"))["ask_about"]

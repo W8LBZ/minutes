@@ -21,6 +21,7 @@ def main() -> None:
     ci.add_argument("--write", action="store_true", help="save it (refuses if a chow schedule already exists)")
     rem = sub.add_parser("reminders", help="email owners about business items coming due or past due (run daily)")
     rem.add_argument("--dry-run", action="store_true", help="print what would be sent; send and record nothing")
+    sub.add_parser("ai-ask-about", help="ask the AI for 'ask about' prompts for each member's community report (also runs after each Submit)")
     srv = sub.add_parser("serve", help="run the web UI")
     srv.add_argument("--host", default="127.0.0.1")
     srv.add_argument("--port", type=int, default=8000)
@@ -87,6 +88,12 @@ def main() -> None:
                 business.save(s)
         if not due:
             print("nothing to remind")
+    elif a.cmd == "ai-ask-about":
+        from . import console
+        from .club import Club, MEETINGS
+        from .store import Archive
+        n = console.refresh_ask_about(Archive(MEETINGS, Club()))
+        print(f"prompts for {n} members saved")
     elif a.cmd == "chow-import":
         from . import chow
         from .club import Club

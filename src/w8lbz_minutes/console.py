@@ -12,7 +12,8 @@ import logging
 import shutil
 import time
 
-from . import auth, business, chow
+from . import ai, auth, business, chow
+from .club import DATA
 from .meeting import SECTIONS, Item, Meeting
 from .store import Archive
 
@@ -79,6 +80,47 @@ def sync_business(archive: Archive, slug: str, s: dict) -> None:
         m.save(archive.root)
 
 
+# ---------------- AI "ask about" prompts for Community Reports (ai.ask_about) ----------------
+REPORTS_BACK = 4
+
+
+def report_histories(archive: Archive) -> dict[str, list[tuple[str, str]]]:
+    """Each active member's last few community reports from submitted minutes, oldest first."""
+    out: dict[str, list[tuple[str, str]]] = {}
+    for mt in archive.meetings:  # newest first
+        if mt.status == "draft":
+            continue
+        for it in mt.items("Community Reports"):
+            m = archive.club.members.get(it.member or "")
+            if m and m.status.lower() not in ("inactive", "silent key") and len(out.setdefault(m.id, [])) < REPORTS_BACK:
+                out[m.id].append((mt.slug, it.text))
+    return {mid: r[::-1] for mid, r in out.items()}
+
+
+def refresh_ask_about(archive: Archive) -> int:
+    """Ask the AI what's worth following up for every member; saved for the console. Returns members covered."""
+    hist = report_histories(archive)
+    prompts = ai.ask_about(archive.club, hist)
+    data = {"at": int(time.time()), "model": archive.club.ai.get("model"),
+            "members": {mid: {"prompts": p, "upto": hist[mid][-1][0]} for mid, p in prompts.items()}}
+    path = DATA / "ask-about.json"
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=1))
+    tmp.chmod(0o600)
+    tmp.replace(path)
+    return len(prompts)
+
+
+def ask_about_for(history: dict[str, list]) -> dict[str, list[str]]:
+    """Saved prompts that are still current: made after the member's latest report shown in the console."""
+    p = DATA / "ask-about.json"
+    if not p.exists():
+        return {}
+    members = json.loads(p.read_text()).get("members", {})
+    return {mid: e["prompts"] for mid, e in members.items()
+            if history.get(mid) and e.get("upto") == history[mid][0][0]}
+
+
 def previous(archive: Archive, date: dt.date) -> Meeting | None:
     return next((m for m in archive.meetings if m.date < date and m.status != "draft"), None)
 
@@ -131,6 +173,7 @@ def context(archive: Archive, m: Meeting) -> dict:
         "email": {"roster": len(recipients(archive)), "only_to": club.email.get("only_to")},
         "chow": chow_tonight(archive, m),
         "business": business_items(archive, m.slug),
+        "ask_about": ask_about_for(history),
     }
 
 

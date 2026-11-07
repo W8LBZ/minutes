@@ -41,3 +41,5 @@ textarea { resize: vertical; min-height: 2.4rem; }
 .bizitem select, .bizitem input[type=date] { font: inherit; padding: .15rem; }
 .bizcomment { background: #f3f4ee; border-radius: .35rem; padding: .25rem .5rem; margin: .25rem 0; font-size: .95rem; }
 .notesbox { border: 1px solid #d9dccf; border-radius: .5rem; padding: .2rem .7rem .5rem; margin-top: 1rem; }
+.askabout ul { margin: .2rem 0 .4rem 1.1rem; padding: 0; font-weight: 600; } .askabout details summary { cursor: pointer; }
+.badge.ai { background: #6b5fb5; color: #fff; }
