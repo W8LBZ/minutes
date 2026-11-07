@@ -247,7 +247,8 @@ def test_admin_mode(tmp_path, monkeypatch):
     assert [(e["on"], e.get("confirmed_by")) for e in log if "on" in e] == [(True, "email"), (False, None)]
 
     monkeypatch.setattr(web, "PREVIEW", "some-branch")
-    assert c.get("/admin/email").status_code == 200                       # the preview outbox is for admins
+    assert c.get("/admin/email", follow_redirects=False).headers["location"].startswith("/admin/confirm")  # admin mode first
+    assert "Email log" not in c.get("/links").text and "Email outbox" not in c.get("/links").text
 
     c.cookies.set(web.COOKIE, a.new_session("kd8ccc"))                    # not an admin: can't turn it on
     assert c.post("/admin/mode", data={"on": 1}).status_code == 403

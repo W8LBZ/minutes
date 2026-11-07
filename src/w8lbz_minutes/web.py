@@ -994,7 +994,7 @@ def email_log(request: Request, mid: str = Depends(real_me)):
     """Admins: every email the app sent, or held back in test mode, newest first. On a preview, its outbox."""
     if not archive.club.is_admin(mid):
         raise HTTPException(404)
-    if not admin_mode(request) and not PREVIEW:  # bodies can hold members' contact details
+    if not admin_mode(request):  # bodies can hold members' contact details
         return RedirectResponse("/admin/confirm?next=/admin/email", status_code=303)
     p = DATA / ("preview-outbox.jsonl" if PREVIEW else "email-log.jsonl")
     mail = [json.loads(line) for line in p.read_text().splitlines() if line.strip()][::-1][:300] if p.exists() else []
