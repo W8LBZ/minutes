@@ -1,8 +1,7 @@
-{% extends "base.html" %}{% block title %}{{ 'Preview outbox' if PREVIEW else 'Email log' }}{% endblock %}{% block body %}
-{% if PREVIEW %}<h1>Preview outbox</h1>
-<p class="muted">Emails this preview would have sent, newest first. None of them left this machine. "Held back" shows who email test mode (<code>email.only_to</code>) would skip on the live site.</p>
-{% else %}<h1>Email log</h1>
-<p class="muted">Every email the app sent or held back, newest first (the last 300).
+{% extends "base.html" %}{% block title %}Email log{% endblock %}{% block body %}
+<h1>Email log</h1>
+{% if PREVIEW %}<p class="muted">Emails this preview would have sent, newest first. None of them left this machine. "Held back" shows who email test mode (<code>email.only_to</code>) would skip on the live site.</p>
+{% else %}<p class="muted">Every email the app sent or held back, newest first (the last 300).
 {% if test_mode %}<b>Test mode is on:</b> only the addresses in <code>email.only_to</code> get mail; everyone else is listed as held back.{% else %}Test mode is off: everyone on the roster gets mail.{% endif %}
 Admins only, since messages can include members' contact details.</p>{% endif %}
 {% for e in mail %}<article class="mail">
