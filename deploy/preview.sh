@@ -6,7 +6,7 @@
 #   deploy/preview.sh --list          show running previews
 #
 # Each preview gets its own checkout and its own copy of data/ (meetings, roster cache, chow schedule;
-# never the login database). It runs in preview mode: email goes to an outbox page instead of being sent,
+# never the login database), with made-up contact details in place of the real ones. It runs in preview mode: email goes to an outbox page instead of being sent,
 # and roster edits go to a local copy of the sheet. Ports start at 8100.
 set -euo pipefail
 REPO=$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)
@@ -45,6 +45,8 @@ find "$DIR/data" -mindepth 1 -maxdepth 1 ! -name auth.sqlite -exec rm -rf {} +
 find "$REPO/data" -mindepth 1 -maxdepth 1 ! -name 'auth.sqlite*' ! -name 'preview-*' -exec cp -r {} "$DIR/data/" \;
 [ -f "$REPO/private/bylaws.md" ] && cp "$REPO/private/bylaws.md" "$DIR/data/"
 cp "$REPO/club.yaml" "$DIR/club.yaml"
+# Made-up contact details for everyone (see the script for which members to test sharing with).
+[ -f "$DIR/data/roster.json" ] && python3 "$REPO/deploy/preview-fake.py" "$DIR/data"
 chmod -R go-rwx "$DIR/data" "$DIR/club.yaml"
 
 if [ -f "$DIR/port" ]; then PORT=$(cat "$DIR/port")
