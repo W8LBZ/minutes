@@ -105,13 +105,14 @@ button.linkbtn:hover { color: var(--danger); } button.linkbtn.more { color: var(
 /* ---------- top bar ---------- */
 nav.top { position: sticky; top: 0; z-index: 30; display: flex; gap: .25rem; align-items: center; padding: .5rem 1.1rem;
   background: var(--nav-bg); flex-wrap: wrap; box-shadow: 0 1px 0 rgba(0, 0, 0, .15); }
-nav.top a { color: var(--nav-text); text-decoration: none; padding: .35rem .7rem; border-radius: .5rem; font-size: .95rem; transition: background .15s; }
+nav.top a { color: var(--nav-text); text-decoration: none; padding: .35rem .62rem; border-radius: .5rem; font-size: .95rem; transition: background .15s; }
 nav.top a:hover { background: var(--nav-hover); } nav.top a.on { background: var(--nav-on); font-weight: 600; }
 nav.top .brand { font-weight: 700; display: flex; align-items: center; gap: .5rem; margin-right: .8rem; padding-left: 0; font-size: 1.02rem; }
 nav.top .brand:hover { background: none; } nav.top .brand img { width: 30px; background: #fff; border-radius: 50%; }
 nav.top form { margin-left: auto; }
-nav.top input[type=search] { padding: .38rem .8rem; border-radius: 2rem; border: 1px solid transparent; width: 14rem;
+nav.top input[type=search] { padding: .38rem .8rem; border-radius: 2rem; border: 1px solid transparent; width: 13rem;
   background: rgba(255, 255, 255, .92); color: #1b1f17; }
+@media (max-width: 1250px) { nav.top input[type=search] { width: 10rem; } }
 nav.top .menu { position: relative; margin-left: .4rem; }
 nav.top .menu summary { list-style: none; cursor: pointer; color: var(--nav-text); }
 nav.top .menu summary::-webkit-details-marker { display: none; }
@@ -277,3 +278,4 @@ ol.nights > li.none .dateblk { opacity: .55; } ol.nights > li.tonight { box-shad
 /* misc older bits */
 section.suggestions { border: 1px solid var(--ai); background: var(--ai-soft); border-radius: var(--radius); padding: .3rem 1rem .8rem; margin: 1rem 0 1.5rem; }
 .sugg { border-bottom: 1px solid var(--border); padding: .5rem 0; } .sugg form { display: inline-block; vertical-align: bottom; }
+nav.top .drop .ico { display: inline-block; width: 1.3rem; }
