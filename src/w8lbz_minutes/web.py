@@ -710,6 +710,16 @@ def admin_updates_run(request: Request, target: str = Form(""), notes_done: int 
                                                            "reload this page to see the result."), status_code=303)
 
 
+@app.post("/admin/updates/cancel")
+def admin_updates_cancel(request: Request, mid: str = Depends(real_me)):
+    _admin(mid)
+    if not admin_mode(request):
+        raise HTTPException(403, "Turn on admin mode first.")
+    updates.cancel()
+    _admin_log(request, update_cancelled=True)
+    return RedirectResponse("/admin/updates?note=" + quote("Request withdrawn."), status_code=303)
+
+
 @app.post("/admin/view-as")
 def admin_view_as(request: Request, member: str = Form(""), next: str = Form("/"), mid: str = Depends(real_me)):
     """Start (member=id) or stop (member empty) viewing the app as another member. Admin mode only; logged."""
