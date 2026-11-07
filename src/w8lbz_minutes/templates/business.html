@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Business{% endblock %}{% block body %}
 <h1>Business items</h1>
 <p class="muted">Club business from the meetings. Each item stays in Old Business every week until it's marked done, so nothing gets dropped.
-{% if leader %}Leaders can change any item; members can update the ones they own.{% else %}Anyone can comment; if an item is yours, you can update it or mark it done.{% endif %}</p>
+{% if leader %}Officers can change any item; members can update the ones they own.{% else %}Anyone can comment; if an item is yours, you can update it or mark it done. Whoever leads a meeting manages items from the console.{% endif %}</p>
 <nav class="tabs">{% for t, label in tabs %}<a href="/business?tab={{ t }}" class="{{ 'on' if tab == t }}">{{ label }}</a>{% endfor %}</nav>
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
 {% if note %}<p class="msg ok">{{ note }}</p>{% endif %}

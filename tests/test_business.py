@@ -85,7 +85,7 @@ def test_business_page_permissions(env, monkeypatch, tmp_path):
     assert "Club patches for hats" in c.get("/business").text and "Add an item" not in c.get("/business").text
     assert c.post("/business/add", data={"text": "x"}).status_code == 403
     iid = business.load()["items"][0]["id"]
-    assert "Only a leader or the item" in c.post(f"/business/{iid}/edit", data={"due": "2026-12-01"}).text
+    assert "Only an officer or the item" in c.post(f"/business/{iid}/edit", data={"due": "2026-12-01"}).text
     who["id"] = "sec"
     c.post(f"/business/{iid}/edit", data={"owner": "amy"})
     who["id"] = "amy"  # now Amy owns it: she can set the due date and mark it done, but not hand it off
@@ -173,3 +173,23 @@ def test_owner_typed_by_name(env, monkeypatch):
     assert "No member called" in c.post(f"/business/{iid}/edit", data={"owner": "Nobody Here"}).text
     c.post("/business/add", data={"text": "Book the pavilion", "owner": "Amy Able"})
     assert business.load()["items"][-1]["owner"] == "amy"
+
+
+def test_minutes_editors_manage_business_only_from_the_console(env, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    club, a = env
+    club.members["bob"].minutes_editor = True  # may lead a meeting, but isn't an officer
+    monkeypatch.setattr(web, "archive", a)
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "bob")
+    c = TestClient(web.app)
+    page = c.get("/business").text
+    assert "Add an item" not in page and "Edit</button>" not in page and "Mark done" not in page
+    iid = business.load()["items"][0]["id"]
+    assert c.post("/business/add", data={"text": "x"}).status_code == 403
+    assert "Only an officer" in c.post(f"/business/{iid}/edit", data={"text": "changed"}).text
+    # In the console, as the meeting's leader, he can.
+    r = c.post(f"/business/{iid}/edit", data={"text": "changed", "meeting": "2026-11-05"}, headers={"Accept": "application/json"})
+    assert r.status_code == 200 and business.get(business.load(), iid)["text"] == "changed"
+    assert c.post("/business/add", data={"text": "New thing", "meeting": "2026-11-05"},
+                  headers={"Accept": "application/json"}).status_code == 200
