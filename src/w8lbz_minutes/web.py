@@ -214,8 +214,9 @@ _chow_lock = threading.Lock()
 
 
 def can_edit_chow(request: Request) -> bool:
-    """Leaders (officers and minutes editors) and admins in admin mode; it's the Secretary's job day to day."""
-    return archive.club.can_lead(request.state.member) or admin_mode(request)
+    """Changing the schedule: officers (it's the Secretary's job day to day) and admins in admin mode.
+    Minutes editors see the member view; they record chow on meeting night from the console."""
+    return privileged(request)
 
 
 def chow_change(request: Request, fn, back: str = "/chow"):
@@ -288,7 +289,7 @@ def chow_swap(request: Request, a: str = Form(...), b: str = Form(...), mid: str
 
 @app.post("/chow/record")
 def chow_record(request: Request, date: str = Form(...), status: str = Form(...), covered_by: str = Form(""),
-                note: str = Form(""), next: str = Form("/chow/history"), mid: str = Depends(chow_leader)):
+                note: str = Form(""), next: str = Form("/chow/history"), mid: str = Depends(leader)):
     def run(s):
         chow.record(archive.club, s, date, status, mid, covered_by or None, note)
         return {"section": chow.minutes_section(archive.club, s, chow.history(), date)}  # for the console
