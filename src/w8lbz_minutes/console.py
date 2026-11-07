@@ -64,9 +64,11 @@ def _since(archive: Archive, slug: str) -> str | None:
 def business_items(archive: Archive, slug: str, s: dict | None = None) -> dict:
     """The console's Old and New Business: tracked items as of this meeting."""
     s = s or business_state(archive)
-    old, new = business.for_meeting(s, slug, _since(archive, slug))
-    return {"old": [business.view(archive.club, x, slug) for x in old],
-            "new": [business.view(archive.club, x, slug) for x in new]}
+    since = _since(archive, slug)
+    old, new = business.for_meeting(s, slug, since)
+    return {"old": [business.view(archive.club, x, slug, since) for x in old],
+            "new": [business.view(archive.club, x, slug, since) for x in new],
+            "notes": [{**n, "name": archive.club.name(n["by"])} for n in business.notes_for(s, slug)]}
 
 
 def sync_business(archive: Archive, slug: str, s: dict) -> None:

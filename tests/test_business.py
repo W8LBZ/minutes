@@ -118,3 +118,41 @@ def test_reminders_once_each_and_only_owners(env):
     business.edit(s, soon["id"], "amy", due="2026-12-10")                              # a new date: a new reminder
     assert [x["text"] for x, _ in business.due_reminders(s, dt.date(2026, 12, 8))["amy"]] == ["Book the park"]
     assert late["reminded"] == {"overdue": "2026-11-20"}
+
+
+def test_comments_history_and_notes(env, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    club, a = env
+    monkeypatch.setattr(web, "archive", a)
+    who = {"id": "bob"}
+    monkeypatch.setattr(web.authn, "member_for", lambda token: who["id"])
+    monkeypatch.setattr(web, "upcoming_meetings", lambda n=4: [dt.date(2026, 11, 12), dt.date(2026, 11, 19)])
+    c = TestClient(web.app)
+    c.get("/business")                                            # seeds from the Oct 29 minutes
+    iid = business.load()["items"][0]["id"]
+    c.post(f"/business/{iid}/comment", data={"text": "I can help with the patches"})   # any member can comment
+    x = business.get(business.load(), iid)
+    assert [cm["text"] for cm in x["comments"]] == ["I can help with the patches"]
+    who["id"] = "amy"
+    assert "only delete your own" in c.post(f"/business/{iid}/comments/{x['comments'][0]['id']}/delete").text
+
+    who["id"] = "sec"                                             # a leader rewords it at a meeting: the old text is kept
+    c.post(f"/business/{iid}/edit", data={"text": "Club patches: Chris orders them", "meeting": "2026-11-05"})
+    h = business.get(business.load(), iid)["history"][-1]
+    assert h["changes"] == {"text": ["Club patches for hats", "Club patches: Chris orders them"]} and h["meeting"] == "2026-11-05"
+    page = c.get("/business").text
+    assert "History" in page and "Club patches for hats</s>" in page and "I can help with the patches" in page
+
+    who["id"] = "bob"                                             # a note for a meeting he'll miss
+    assert c.post("/business/notes", data={"text": "x", "meeting": "2027-01-01"}).status_code == 400
+    c.post("/business/notes", data={"text": "Can't make the 12th. I built a new minutes app.", "meeting": "2026-11-12"})
+    n = business.load()["notes"][0]
+    assert "Your note for" in c.get("/business").text
+    assert "Only the meeting" in c.post(f"/business/notes/{n['id']}/read").text   # only a leader marks it read
+    who["id"] = "sec"
+    s = business.load()
+    assert [x["text"] for x in business.notes_for(s, "2026-11-05")] == []         # not for an earlier meeting
+    assert [x["text"] for x in business.notes_for(s, "2026-11-12")] == ["Can't make the 12th. I built a new minutes app."]
+    r = c.post(f"/business/notes/{n['id']}/read", data={"meeting": "2026-11-12"}, headers={"Accept": "application/json"})
+    assert r.json()["notes"] == [] and business.load()["notes"][0]["status"] == "read"

@@ -254,7 +254,10 @@ def business_page(request: Request, error: str = "", note: str = "", mid: str = 
     leader_ = can_lead_now(request)
     pending = [g for g in s["suggestions"] if g["status"] == "pending"] if leader_ else []
     submitted = [m for m in archive.meetings if m.status != "draft"][:6]
+    my_notes = [n for n in s["notes"] if n["by"] == mid and n["status"] == "pending"]
+    all_notes = [n for n in s["notes"] if n["status"] == "pending"] if leader_ else []
     return page(request, "business.html", open_items=open_, done=done, error=error, note=note, leader=leader_,
+                my_notes=my_notes, all_notes=all_notes, next_meetings=upcoming_meetings(),
                 suggestions=pending, ai_on=ai.configured(archive.club) and leader_, submitted=submitted,
                 by_id={x["id"]: x for x in items},
                 members=members, today=today, fmt=lambda d: dt.date.fromisoformat(d).strftime("%b %-d, %Y"))
@@ -328,8 +331,40 @@ async def business_edit(request: Request, iid: str, mid: str = Depends(me)):
         raise HTTPException(404)
     def run(s):
         _may_edit_item(request, s, iid)
-        business.edit(s, iid, mid, **fields)
+        business.edit(s, iid, mid, meeting=form.get("meeting") or None, **fields)
     return business_change(request, run, form.get("meeting", ""))
+
+
+@app.post("/business/{iid}/comment")
+def business_comment(request: Request, iid: str, text: str = Form(...), mid: str = Depends(me)):
+    """Any member can comment on an item: an update, a question, "I can help with this"."""
+    return business_change(request, lambda s: business.comment(s, iid, mid, text), back=f"/business#i{iid}")
+
+
+@app.post("/business/{iid}/comments/{cid}/delete")
+def business_comment_delete(request: Request, iid: str, cid: str, mid: str = Depends(me)):
+    return business_change(request, lambda s: business.delete_comment(s, iid, cid, mid, can_lead_now(request)),
+                           back=f"/business#i{iid}")
+
+
+def upcoming_meetings(n: int = 4) -> list[dt.date]:
+    today = dt.date.today()
+    return chow.meeting_nights(archive.club, today, today + dt.timedelta(days=7 * n))[:n]
+
+
+@app.post("/business/notes")
+def business_note_add(request: Request, text: str = Form(...), meeting: str = Form(...), mid: str = Depends(me)):
+    if meeting not in {d.isoformat() for d in upcoming_meetings()}:
+        raise HTTPException(400, "Pick one of the next meetings.")
+    return business_change(request, lambda s: business.add_note(s, mid, text, meeting), back="/business#notes")
+
+
+@app.post("/business/notes/{nid}/{status}")
+def business_note_status(request: Request, nid: str, status: str, meeting: str = Form(""), mid: str = Depends(me)):
+    if status not in ("read", "dismissed", "withdrawn"):
+        raise HTTPException(404)
+    return business_change(request, lambda s: business.note_status(s, nid, status, mid, can_lead_now(request)),
+                           meeting, back="/business#notes")
 
 
 @app.post("/business/{iid}/done")

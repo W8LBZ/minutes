@@ -176,6 +176,13 @@
     if (!S.done.includes(k)) S.done.push(k);
     S.current = null; render(); save();
   }
+  async function noteStatus(n, status) {
+    const r = await fetch(`/business/notes/${n.id}/${status}`, { method: "POST", headers: { Accept: "application/json" },
+      body: new URLSearchParams({ meeting: M.slug }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { alert(j.error || j.detail || "Couldn't save"); return; }
+    D.business = j; render(); save();
+  }
   function reports() {
     const rem = remaining();
     const groups = [["Online", rem.filter((k) => M.remote.includes(k))], ["In person", rem.filter((k) => M.in_person.includes(k))],
@@ -212,7 +219,14 @@
       floor = h("div", { class: "floor" }, h("h3", {}, rem.length ? "Who's next?" : "Everyone has reported"),
         h("p", { class: "hint" }, rem.length ? "Press “Suggest next” or call on someone." : "Use “Edit” to change a report, or move on to Old Business."));
     }
-    const others = h("div", {}, h("h3", { style: "margin-top:1.2rem" }, "Other reports"),
+    // Notes members sent in for tonight (Business page): read them out, then add them to the reports.
+    const notes = (D.business.notes || []).length ? h("div", { class: "notesbox" }, h("h3", {}, "Notes sent in"),
+      D.business.notes.map((n) => h("div", { class: "bizcomment" }, h("b", {}, `${n.name}: `), n.text, " ",
+        h("button", { class: "btn small", onclick: async () => {
+          S.others.push(`${n.name} sent a note: ${n.text}`);
+          await noteStatus(n, "read"); } }, "Add to reports"),
+        h("button", { class: "btn small ghost", onclick: () => noteStatus(n, "dismissed") }, "Skip")))) : null;
+    const others = h("div", {}, notes, h("h3", { style: "margin-top:1.2rem" }, "Other reports"),
       h("p", { class: "hint" }, "For news passed along by someone who isn't present, e.g. “Jeremy sent a message recommending…”."),
       itemRows(S.others, (arr) => { S.others = arr; }));
     return h("div", {}, h("h2", {}, "Community Reports"), h("div", { class: "cols2" }, queue, h("div", {}, floor, others)));
@@ -274,7 +288,8 @@
             onclick: () => { if (confirm("Delete this item?")) send(`/business/${x.id}/delete`, {}); } }, "✕") : null),
         h("div", { class: "row meta" }, owner, " due ", due,
           x.overdue ? h("span", { class: "badge warn" }, `overdue since ${fmtDate(x.due)}`) : null,
-          !isNew ? h("span", { class: "hint" }, ` since ${fmtDate(x.opened)}`) : null));
+          !isNew ? h("span", { class: "hint" }, ` since ${fmtDate(x.opened)}`) : null),
+        (x.new_comments || []).map((c) => h("div", { class: "bizcomment" }, h("b", {}, `${c.name}: `), c.text)));
     };
     const add = () => {
       const ta = h("textarea", { rows: 1, placeholder: isNew ? "New item…" : "", oninput: (e) => grow(e.target) });

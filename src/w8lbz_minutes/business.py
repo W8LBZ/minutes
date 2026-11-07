@@ -36,6 +36,7 @@ def load() -> dict:
     s.setdefault("items", [])
     s.setdefault("seeded", False)
     s.setdefault("suggestions", [])  # from the AI (ai.py); pending until a leader accepts or dismisses
+    s.setdefault("notes", [])        # members' notes for an upcoming meeting (can't make it, news to pass on)
     return s
 
 
@@ -102,8 +103,8 @@ def _date(v: str | None) -> str | None:
         raise ValueError(f"{v} isn't a date.")
 
 
-def _note(x: dict, by: str | None, what: str) -> None:
-    x["history"].append({"at": int(time.time()), "by": by, "what": what})
+def _note(x: dict, by: str | None, what: str, **detail) -> None:
+    x["history"].append({"at": int(time.time()), "by": by, "what": what, **detail})
 
 
 def add(s: dict, text: str, by: str | None, owner: str | None = None, due: str | None = None,
@@ -119,10 +120,11 @@ def add(s: dict, text: str, by: str | None, owner: str | None = None, due: str |
     return x
 
 
-def edit(s: dict, iid: str, by: str, **fields) -> dict:
-    """Change text, owner, due or agenda (None/"" clears owner and dates)."""
+def edit(s: dict, iid: str, by: str, meeting: str | None = None, **fields) -> dict:
+    """Change text, owner, due or agenda (None/"" clears owner and dates). Each change keeps the old
+    and new value in the item's history, with the meeting it was made at (if any)."""
     x = get(s, iid)
-    changes = []
+    changes = {}
     for k, v in fields.items():
         if k == "text":
             v = " ".join((v or "").split())[:MAX_TEXT]
@@ -135,18 +137,74 @@ def edit(s: dict, iid: str, by: str, **fields) -> dict:
         else:
             continue
         if x[k] != v:
-            changes.append(k)
+            changes[k] = [x[k], v]
             x[k] = v
     if changes:
-        _note(x, by, "changed " + ", ".join(changes))
+        _note(x, by, "changed " + ", ".join(changes), changes=changes, **({"meeting": meeting} if meeting else {}))
     return x
+
+
+MAX_COMMENT = 1000
+
+
+def comment(s: dict, iid: str, by: str, text: str) -> dict:
+    """Any member can add a comment to an open item (an update, a question); it's shown with the item."""
+    x = get(s, iid)
+    text = text.strip()[:MAX_COMMENT]
+    if not text:
+        raise ValueError("The comment is empty.")
+    c = {"id": secrets.token_hex(4), "at": int(time.time()), "by": by, "text": text}
+    x.setdefault("comments", []).append(c)
+    return c
+
+
+def delete_comment(s: dict, iid: str, cid: str, by: str, leader: bool) -> None:
+    x = get(s, iid)
+    c = next((c for c in x.get("comments", []) if c["id"] == cid), None)
+    if not c or not (leader or c["by"] == by):
+        raise ValueError("You can only delete your own comments.")
+    x["comments"].remove(c)
+
+
+# ---------------- notes for an upcoming meeting ----------------
+
+def add_note(s: dict, by: str, text: str, meeting: str) -> dict:
+    """A member's note for a meeting: e.g. they can't make it, and here's their news."""
+    text = text.strip()[:MAX_COMMENT]
+    if not text:
+        raise ValueError("The note is empty.")
+    n = {"id": secrets.token_hex(4), "at": int(time.time()), "by": by, "text": text,
+         "meeting": _date(meeting), "status": "pending"}
+    s["notes"].append(n)
+    return n
+
+
+def note_status(s: dict, nid: str, status: str, by: str, leader: bool) -> dict:
+    """pending -> read (added to the minutes) or dismissed; the author can withdraw a pending note."""
+    n = next((n for n in s["notes"] if n["id"] == nid), None)
+    if not n:
+        raise ValueError("No such note.")
+    if status == "withdrawn":
+        if n["by"] != by or n["status"] != "pending":
+            raise ValueError("Only your own note, before the meeting uses it.")
+        s["notes"].remove(n)
+        return n
+    if not leader:
+        raise ValueError("Only the meeting's leader can do that.")
+    n["status"], n["handled_by"] = status, by
+    return n
+
+
+def notes_for(s: dict, meeting: str) -> list[dict]:
+    """Pending notes for this meeting, and any left over from earlier ones."""
+    return [n for n in s["notes"] if n["status"] == "pending" and n["meeting"] <= meeting]
 
 
 def close(s: dict, iid: str, by: str, date: str | None = None) -> dict:
     x = get(s, iid)
     if x["status"] != "done":
         x["status"], x["closed"] = "done", _date(date) or dt.date.today().isoformat()
-        _note(x, by, "marked done")
+        _note(x, by, "marked done", **({"meeting": date} if date else {}))
     return x
 
 
@@ -218,7 +276,7 @@ QUIET_WEEKS = 6
 
 def quiet(x: dict, today: str) -> bool:
     """Open, and nothing has changed for QUIET_WEEKS weeks: worth asking about."""
-    last = max((h["at"] for h in x["history"]), default=0)
+    last = max([h["at"] for h in x["history"]] + [c["at"] for c in x.get("comments", [])], default=0)
     return x["status"] == "open" and (dt.date.fromisoformat(today) - dt.date.fromtimestamp(last)).days >= 7 * QUIET_WEEKS
 
 
@@ -253,9 +311,11 @@ def sections(s: dict, club: Club, date: str, since: str | None = None) -> dict[s
     return {"Old Business": [line(club, x, date) for x in old], "New Business": [line(club, x, date) for x in new]}
 
 
-def view(club: Club, x: dict, today: str) -> dict:
-    """An item for the console and the Business page."""
-    return {**x, "owner_name": club.name(x["owner"]) if x["owner"] else None,
+def view(club: Club, x: dict, today: str, since: str | None = None) -> dict:
+    """An item for the console and the Business page. `since`: the previous meeting, for "new comments"."""
+    cutoff = dt.datetime.fromisoformat(since).timestamp() if since else 0  # from that meeting's day on
+    return {**x, "new_comments": [{**c, "name": club.short(c["by"])} for c in x.get("comments", []) if c["at"] >= cutoff],
+            "owner_name": club.name(x["owner"]) if x["owner"] else None,
             "overdue": bool(x["status"] == "open" and x["due"] and x["due"] < today), "quiet": quiet(x, today)}
 
 

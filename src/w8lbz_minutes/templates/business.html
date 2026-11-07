@@ -25,8 +25,22 @@
   <button class="btn small ghost">Suggest follow-ups</button> <span class="hint">This happens by itself when minutes are submitted. It takes a few seconds.</span></form>{% endif %}
 </section>{% endif %}
 
+<section id="notes" class="notes">
+<h2>Notes for the next meeting</h2>
+<p class="hint">Can't make it, or have news for the club? Leave a note and the leader reads it out with the community reports.</p>
+{% for n in my_notes %}<div class="comment"><span class="muted small">Your note for {{ fmt(n.meeting) }}</span>
+  <form method="post" action="/business/notes/{{ n.id }}/withdrawn" class="inline"><button class="linkbtn">Withdraw</button></form><div>{{ n.text }}</div></div>{% endfor %}
+<details class="edit"{{ ' open' if not my_notes }}><summary>Leave a note</summary>
+<form method="post" action="/business/notes" class="profile">
+  <label>For the meeting on <select name="meeting">{% for d in next_meetings %}<option value="{{ d.isoformat() }}">{{ d.strftime('%A, %B %-d') }}</option>{% endfor %}</select></label>
+  <label>Note <textarea name="text" rows="3" required placeholder="e.g. I won't be at the meeting on the 12th. Since last meeting I built a new app for the club's minutes."></textarea></label>
+  <button class="btn small">Send note</button></form></details>
+{% if all_notes %}<h3>Waiting to be read <span class="muted small">(leaders)</span></h3>
+{% for n in all_notes %}<div class="comment"><b>{{ club.name(n.by) }}</b> <span class="muted small">for {{ fmt(n.meeting) }}</span><div>{{ n.text }}</div></div>{% endfor %}{% endif %}
+</section>
+
 <h2>Open <span class="muted small">{{ open_items|length }}</span></h2>
-<ul class="business">{% for x in open_items %}{% set mine = leader or x.owner == me.id %}<li class="{{ 'overdue' if x.overdue }}">
+<ul class="business">{% for x in open_items %}{% set mine = leader or x.owner == me.id %}<li class="{{ 'overdue' if x.overdue }}" id="i{{ x.id }}">
   <div class="text">{{ x.text }}</div>
   <div class="meta muted small">
     {% if x.owner %}<a href="/members/{{ x.owner }}">{{ x.owner_name }}</a>{% else %}No owner{% endif %}
@@ -35,15 +49,25 @@
     {% if x.quiet %} · <span class="badge warn" title="Nothing has changed on it for weeks">quiet for a while: still on?</span>{% endif %}
     · since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a>
   </div>
-  {% if mine %}<details class="edit"><summary>Change</summary>
+  {% for c in x.comments or [] %}<div class="comment"><b>{{ club.short(c.by) }}</b> <span class="muted small">{{ c.at|ts }}</span>
+    {% if leader or c.by == me.id %}<form method="post" action="/business/{{ x.id }}/comments/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')"><button class="linkbtn" title="Delete">✕</button></form>{% endif %}
+    <div>{{ c.text }}</div></div>{% endfor %}
+  <details class="edit"><summary>Comment</summary>
+    <form method="post" action="/business/{{ x.id }}/comment" class="profile"><textarea name="text" rows="2" required placeholder="An update, a question, or an offer to help"></textarea>
+      <button class="btn small">Add comment</button></form></details>
+  {% if mine %}<details class="edit"><summary>Edit or mark done</summary>
     <form method="post" action="/business/{{ x.id }}/edit" class="profile">
-      <label>Item <textarea name="text" rows="2" required>{{ x.text }}</textarea></label>
+      <label>Item <textarea name="text" rows="2" required>{{ x.text }}</textarea>
+        <span class="hint">Minutes already submitted keep the wording they had; the change shows from the next meeting on.</span></label>
       {% if leader %}<label>Owner <select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == x.owner }}>{{ m.name }}</option>{% endfor %}</select></label>{% endif %}
       <label>Due <input type="date" name="due" value="{{ x.due or '' }}"></label>
       {% if leader %}<label>Hold for the meeting on <input type="date" name="agenda" value="{{ x.agenda or '' }}"> <span class="hint">It stays out of Old Business until that night (e.g. the President's State of the Club).</span></label>{% endif %}
       <button class="btn small">Save</button></form>
     <form method="post" action="/business/{{ x.id }}/done" onsubmit="return confirm('Mark this item done? It shows as done in the next minutes.')"><button class="btn small ghost">Mark done</button></form>
   </details>{% endif %}
+  {% if x.history|length > 1 %}<details class="edit"><summary>History</summary><ul class="history">{% for e in x.history|reverse %}<li>
+    <span class="muted small">{{ e.at|ts }}{% if e.by %} · {{ club.short(e.by) }}{% endif %}{% if e.meeting %} · at the <a href="/meetings/{{ e.meeting }}">{{ fmt(e.meeting) }}</a> meeting{% endif %}</span>
+    {{ e.what }}{% for f, ov in (e.changes or {}).items() %}<div class="change small"><b>{{ f }}:</b> <s class="muted">{{ ov[0] or '(none)' }}</s> → {{ ov[1] or '(none)' }}</div>{% endfor %}</li>{% endfor %}</ul></details>{% endif %}
 </li>{% else %}<li class="muted">Nothing open.</li>{% endfor %}</ul>
 
 {% if leader %}<h2>Add an item</h2>
