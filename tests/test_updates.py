@@ -47,6 +47,11 @@ def test_request(env, monkeypatch):
     assert "requested" in updates.status()
     with pytest.raises(ValueError):
         updates.request("ko4cgq", "0.7.0", True)                          # one at a time
+    req["at"] -= 3600                                                      # an hour later, nothing picked it up
+    (env / "update-request.json").write_text(json.dumps(req))
+    assert updates.status()["stuck"]
+    assert updates.cancel() and "requested" not in updates.status()
+    updates.request("ko4cgq", "0.7.0", True)
     monkeypatch.setattr(updates, "PREVIEW", "branch")
     (env / "update-request.json").unlink()
     with pytest.raises(ValueError):
@@ -82,7 +87,7 @@ def test_admin_page(env, tmp_path, monkeypatch):
     assert "Version 0.7.0 is available" in c.get("/links").text                  # the admin banner says so
     assert "needs the steps" in c.post("/admin/updates/run", data={"target": "0.7.0"}).text
     c.post("/admin/updates/run", data={"target": "0.7.0", "notes_done": 1})
-    assert (tmp_path / "update-request.json").exists() and "Updating to 0.7.0" in c.get("/admin/updates").text
+    assert (tmp_path / "update-request.json").exists() and "Waiting to update to 0.7.0" in c.get("/admin/updates").text
     c.cookies.set(web.COOKIE, a.new_session("bob"))
     assert "of the app is available" not in c.get("/links").text                 # not for members
     assert c.post("/admin/updates/run", data={"target": "0.7.0", "notes_done": 1}).status_code == 403

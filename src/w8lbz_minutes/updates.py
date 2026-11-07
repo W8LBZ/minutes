@@ -20,6 +20,7 @@ from .club import DATA, PREVIEW
 
 log = logging.getLogger("w8lbz.updates")
 REPO = "W8LBZ/minutes"
+STUCK_AFTER = 600  # seconds a request may wait before the page says the updater didn't pick it up
 CHECK_EVERY = 3600  # GitHub allows 60 unauthenticated checks an hour; one is plenty
 
 
@@ -97,7 +98,19 @@ def status() -> dict:
                 out[key] = json.loads(p.read_text())
             except ValueError:
                 out[key] = {}
+    req = out.get("requested")
+    if req and "running" not in out and time.time() - req.get("at", 0) > STUCK_AFTER:
+        out["stuck"] = True  # nothing on the server picked it up: the updater isn't installed or failed to start
     return out
+
+
+def cancel() -> bool:
+    """Withdraw a request the updater never picked up."""
+    p = DATA / "update-request.json"
+    if p.exists():
+        p.unlink()
+        return True
+    return False
 
 
 def request(by: str, target: str, notes_confirmed: bool) -> None:

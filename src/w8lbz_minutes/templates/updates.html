@@ -11,8 +11,13 @@
   {% elif not newer %}<p class="muted">You're up to date.</p>{% endif %}
 </article>
 
-{% if st.requested or st.running %}<article class="card">
-  <div class="card-text">⏳ Updating to {{ (st.running or st.requested).to }}, started {{ (st.running or st.requested).at|tsfull }} by {{ club.short((st.running or st.requested).by) }}.</div>
+{% if st.stuck %}<article class="card overdue">
+  <div class="card-text">⚠ The update to {{ st.requested.to }} asked for {{ st.requested.at|tsfull }} hasn't started.</div>
+  <p class="muted">Nothing on the server picked it up, so the updater probably isn't installed yet. On CT103 run <code>/opt/w8lbz-minutes/deploy/update.sh</code> once by hand (it installs the updater; this request then runs right after), and check <code>systemctl status w8lbz-minutes-update.path</code>. Or withdraw the request:</p>
+  <form method="post" action="/admin/updates/cancel" class="inline"><button class="btn small ghost">Withdraw the request</button></form>
+</article>
+{% elif st.requested or st.running %}<article class="card">
+  <div class="card-text">⏳ {{ 'Updating' if st.running else 'Waiting to update' }} to {{ (st.running or st.requested).to }}, asked for {{ (st.running or st.requested).at|tsfull }} by {{ club.short((st.running or st.requested).by) }}.</div>
   <p class="muted">The app restarts when it's done, usually within a minute or two. Reload this page to see the result.</p>
 </article>
 
