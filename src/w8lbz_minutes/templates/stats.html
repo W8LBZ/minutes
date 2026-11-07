@@ -1,9 +1,10 @@
 {% extends "base.html" %}{% import "_pager.html" as pager %}{% block body %}
 <div class="headrow"><h1>Attendance</h1>
 <form class="filter"><label>Period <select name="period" onchange="this.form.submit()">
+  <option value="6m" {{ 'selected' if period == '6m' }}>Last 6 months</option>
   <option value="12m" {{ 'selected' if period == '12m' }}>Last 12 months</option>
+  {% for y in years %}<option {{ 'selected' if y|string == period }}>{{ y }}</option>{% endfor %}
   <option value="all" {{ 'selected' if period == 'all' }}>All time</option>
-  {% for y in years %}<option value="{{ y }}" {{ 'selected' if period == y|string }}>{{ y }}</option>{% endfor %}
 </select></label><noscript><button class="btn small">Show</button></noscript></form></div>
 <p>{{ s.count }} meeting{{ 's' if s.count != 1 }} {{ label }}, averaging {{ '%.1f'|format(s.avg) }} people per meeting (members and guests).</p>
 <div class="cols">

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import datetime as dt
 import pytest
 
 from w8lbz_minutes.club import Club
@@ -125,17 +126,20 @@ def rows(html):
     return html.count('<tr><td data-sort=')
 
 
-def test_archive_pages_and_page_size(client):
-    html = client.get("/").text
+def test_archive_periods_pages_and_page_size(client):
+    html = client.get("/").text  # this year by default
+    assert rows(html) == 1 and '<option selected>%d</option>' % dt.date.today().year in html
+    html = client.get("/?period=all").text
     assert rows(html) == 25 and "Page 1 of 2" in html and html.count('class="yearrow"') == 3  # this year, 2025, 2024
-    assert rows(client.get("/?page=2").text) == 8
-    assert rows(client.get("/?per=0").text) == 33 and rows(client.get("/?per=10&page=4").text) == 3
-    p1, p2 = client.get("/?year=2024").text, client.get("/?year=2024&page=2").text
+    assert rows(client.get("/?period=all&page=2").text) == 8
+    assert rows(client.get("/?period=all&per=0").text) == 33 and rows(client.get("/?period=all&per=10&page=4").text) == 3
+    p1, p2 = client.get("/?period=2024").text, client.get("/?period=2024&page=2").text
     assert rows(p1) == 25 and rows(p2) == 5 and "Page 2 of 2" in p2
-    assert rows(client.get("/?year=2024&page=99").text) == 5  # clamped to the last page
-    for junk in ("/?year=", "/?year=abc", "/?year=2024&page=x", "/?per=7", "/?per=x"):  # "All years" sends year=
+    assert rows(client.get("/?period=2024&page=99").text) == 5  # clamped to the last page
+    assert rows(client.get("/?period=6m").text) == 1 and rows(client.get("/?period=12m").text) == 1
+    for junk in ("/?period=", "/?period=abc", "/?period=2024&page=x", "/?per=7", "/?per=x"):
         r = client.get(junk)
-        assert r.status_code == 200 and rows(r.text) == 25
+        assert r.status_code == 200 and "Period" in r.text
 
 
 def test_roster_shows_active_by_default(client):
@@ -147,7 +151,8 @@ def test_stats_periods(client):
     assert "33 meetings on record" in client.get("/stats?period=all").text
     html = client.get("/stats?period=2024").text
     assert "30 meetings in 2024" in html and "Page 1 of 3" in html
-    assert "1 meeting in the last 12 months" in client.get("/stats").text
+    assert "1 meeting in the last 12 months" in client.get("/stats?period=12m").text
+    assert "1 meeting in %d" % dt.date.today().year in client.get("/stats").text  # this year by default
 
 def test_guests_page_moves_new_members_to_their_own_section(tmp_path, monkeypatch):
     import datetime as dt

@@ -513,16 +513,28 @@ def paginate(items: list, p: str, per: str, default: int = 25) -> dict:
 
 
 def years() -> list[int]:
-    return sorted({m.date.year for m in archive.meetings}, reverse=True)
+    """Years with minutes, and always this year (the default period, even before its first meeting)."""
+    return sorted({m.date.year for m in archive.meetings} | {dt.date.today().year}, reverse=True)
+
+
+def by_period(period: str) -> tuple[list, str, str]:
+    """Meetings for a period choice: this year (default), 6m, 12m, all, or a year. -> (meetings, period, label)."""
+    today = dt.date.today()
+    if period in ("6m", "12m"):
+        cutoff = today - dt.timedelta(days=182 if period == "6m" else 365)
+        label = "in the last 6 months" if period == "6m" else "in the last 12 months"
+        return [m for m in archive.meetings if m.date > cutoff], period, label
+    if period == "all":
+        return list(archive.meetings), "all", "on record"
+    year = int(period) if period.isdigit() else today.year
+    return [m for m in archive.meetings if m.date.year == year], str(year), f"in {year}"
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, year: str = "", p: str = Query("1", alias="page"), per: str = ""):
-    """Meetings newest first, a page at a time, optionally one year only."""
-    # The "All years" option sends year= (empty); anything that isn't a number means all years.
-    year = int(year) if year.isdigit() else None
-    ms = [m for m in archive.meetings if not year or m.date.year == year]
-    return page(request, "index.html", pg=paginate(ms, p, per), years=years(), year=year)
+def index(request: Request, period: str = "", p: str = Query("1", alias="page"), per: str = ""):
+    """Meetings newest first, a page at a time, for a period (this year by default)."""
+    ms, period, label = by_period(period)
+    return page(request, "index.html", pg=paginate(ms, p, per), years=years(), period=period, label=label)
 
 
 @app.get("/meetings/{slug}", response_class=HTMLResponse)
@@ -683,15 +695,9 @@ def links(request: Request):
 
 
 @app.get("/stats", response_class=HTMLResponse)
-def stats(request: Request, period: str = "12m", p: str = Query("1", alias="page"), per: str = ""):
-    """Attendance for the last 12 months (default), all time, or one year."""
-    if period == "all":
-        ms, label = archive.meetings, "on record"
-    elif period.isdigit():
-        ms, label = [m for m in archive.meetings if m.date.year == int(period)], f"in {period}"
-    else:
-        period, cutoff = "12m", dt.date.today() - dt.timedelta(days=365)
-        ms, label = [m for m in archive.meetings if m.date > cutoff], "in the last 12 months"
+def stats(request: Request, period: str = "", p: str = Query("1", alias="page"), per: str = ""):
+    """Attendance for a period: this year (default), the last 6 or 12 months, all time, or one year."""
+    ms, period, label = by_period(period)
     st = archive.stats(ms)
     return page(request, "stats.html", s=st, pg=paginate(st["rows"], p, per, 10),
                 period=period, label=label, years=years())

@@ -5,7 +5,7 @@ What changed in each version of W8LBZ Minutes. Planned work is in [ROADMAP.md](R
 Versions follow [semantic versioning](https://semver.org): while the app is 0.x, the middle number goes up for new features and the last for fixes. Each version is a git tag (`v0.2.0`), and the app's footer shows the version that's running.
 
 ## Unreleased
-- **Shorter lists:** the archive, the Stats page's Per meeting table and the Roster show a page at a time, with a "Show 10 / 25 / 50 / All" choice. The archive is one list, newest first, with year headings (the Year filter stays). The Roster shows Active members by default; pick another status or Everyone.
+- **Shorter lists:** the archive, the Stats page's Per meeting table and the Roster show a page at a time, with a "Show 10 / 25 / 50 / All" choice. The archive is one list, newest first, with year headings. The archive and Stats share a Period choice: this year (the default), the last 6 or 12 months, any year, or all time. The Roster shows Active members by default; pick another status or Everyone.
 - **Chow schedule** (top menu → Chow), replacing the Secretary's spreadsheet. Leaders get three tabs: Schedule, Rotation, and Past nights & changes.
   - Everyone sees who brings chow each night. A member can **ask another to swap nights**; the other member approves or declines, and both (and the Secretary) get an email.
   - Leaders can assign nights, swap them, mark no-chow nights (holidays), and **fill the schedule** from the rotation. The rotation keeps the same order each round, new members go at the bottom, and limits like "can't do 3rd Thursdays" or "away in February" are respected: that member keeps their turn and gets the next night they can do.
