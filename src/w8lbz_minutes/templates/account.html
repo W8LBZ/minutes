@@ -32,7 +32,7 @@
   <form method="post" action="/logout"><button class="btn ghost">Sign out</button></form>
   <form method="post" action="/account/sessions/end-all" onsubmit="return confirm('Sign out on every device?')"><button class="btn ghost">Sign out everywhere</button></form>
 </div>
-<script src="/static/auth.js"></script>
+<script src="/static/auth.js?v={{ ASSETS }}"></script>
 <script>
 // Passkey names: read-only until "Edit"; "Save" appears only once the name changes.
 document.querySelectorAll("form.rename").forEach((f) => {

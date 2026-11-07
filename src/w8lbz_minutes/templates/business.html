@@ -119,7 +119,7 @@
 {% endif %}
 
 <datalist id="roster-names">{% for m in members %}<option value="{{ m.name }}">{{ m.callsign or '' }}</option>{% endfor %}</datalist>
-<script src="/static/combo.js"></script>
+<script src="/static/combo.js?v={{ ASSETS }}"></script>
 <script>
 // One panel (Comment / Edit / History) open at a time in each card.
 document.querySelectorAll("button.act[data-panel]").forEach((b) => b.addEventListener("click", () => {

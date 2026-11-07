@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block title %}Console {{ m.date }}{% endblock %}{% block body %}
-<link rel="stylesheet" href="/static/console.css">
+<link rel="stylesheet" href="/static/console.css?v={{ ASSETS }}">
 <div class="ch">
   <div><h1>Meeting of {{ m.date|longdate }}</h1>
   Led by <select id="leader">{% for id in leaders %}<option value="{{ id }}" {{ 'selected' if id == m.leader }}>{{ club.name(id) }}</option>{% endfor %}</select>
@@ -15,8 +15,8 @@
 <form method="post" action="/console/{{ m.slug }}/discard" onsubmit="return confirm('Discard this draft completely? This cannot be undone.')" style="text-align:right">
   <button class="btn small ghost" type="submit">Discard draft</button></form>
 <script>window.CONSOLE = {{ data|safe }};</script>
-<script src="/static/combo.js"></script>
-<script src="/static/console.js"></script>
+<script src="/static/combo.js?v={{ ASSETS }}"></script>
+<script src="/static/console.js?v={{ ASSETS }}"></script>
 <script>
 document.getElementById("share").addEventListener("click", async (e) => {
   const b = e.currentTarget, url = location.origin + b.dataset.path;

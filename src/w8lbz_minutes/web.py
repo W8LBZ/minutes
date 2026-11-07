@@ -73,7 +73,17 @@ templates.env.filters["monthday"] = monthday
 templates.env.filters["tsfull"] = lambda t: (dt.datetime.fromtimestamp(t).strftime(DATES["list"] + ", %-I:%M %p")
                                              .replace("AM", "am").replace("PM", "pm")) if t else ""
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
-templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"), PREVIEW=PREVIEW)
+def _assets_stamp() -> str:
+    """A fingerprint of the CSS and JS, added to their links (?v=...) so browsers fetch new copies after an update."""
+    import hashlib
+    h = hashlib.sha1()
+    for f in sorted((HERE / "static").glob("*.[cj]s*")):
+        h.update(f.read_bytes())
+    return h.hexdigest()[:10]
+
+
+templates.env.globals.update(club=archive.club, SECTIONS=SECTIONS, VERSION=version("w8lbz-minutes"), PREVIEW=PREVIEW,
+                             ASSETS=_assets_stamp())
 
 
 # ---------------- login gate ----------------

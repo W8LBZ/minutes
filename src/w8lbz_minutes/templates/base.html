@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}W8LBZ Minutes{% endblock %}</title>
-<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/minutes.css"></head>
+<link rel="stylesheet" href="/static/style.css?v={{ ASSETS }}"><link rel="stylesheet" href="/static/minutes.css?v={{ ASSETS }}"></head>
 <body>
 <nav class="top">
   <a class="brand" href="/"><img src="/static/logo.png" alt="">W8LBZ Minutes</a>
@@ -20,7 +20,7 @@
 <form method="post" action="/admin/mode"><input type="hidden" name="on" value="0"><input type="hidden" name="next" value="{{ request.url.path }}"><button type="submit">Turn off</button></form></div>{% endif %}
 {% if PREVIEW %}<div class="preview">PREVIEW of <b>{{ PREVIEW }}</b>: a copy of the data. Emails aren't sent{% if is_admin %} (see the <a href="/admin/email">outbox</a>){% endif %} and roster edits don't reach the real sheet.</div>{% endif %}
 <main>{% block body %}{% endblock %}</main>
-<script src="/static/sort.js"></script>
+<script src="/static/sort.js?v={{ ASSETS }}"></script>
 <script>  // close the name menu when clicking elsewhere
 document.addEventListener("click", (e) => document.querySelectorAll("details.menu[open]").forEach((d) => { if (!d.contains(e.target)) d.open = false; }));
 </script>
