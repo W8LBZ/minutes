@@ -72,6 +72,7 @@ def monthday(md: str | None) -> str:
 templates.env.filters["monthday"] = monthday
 templates.env.filters["tsfull"] = lambda t: (dt.datetime.fromtimestamp(t).strftime(DATES["list"] + ", %-I:%M %p")
                                              .replace("AM", "am").replace("PM", "pm")) if t else ""
+templates.env.filters["isodate"] = lambda d: dt.date.fromisoformat(d)
 templates.env.filters["ts"] = lambda t: dt.datetime.fromtimestamp(t).strftime(DATES["list"]) if t else "never"
 def _assets_stamp() -> str:
     """A fingerprint of the CSS and JS, added to their links (?v=...) so browsers fetch new copies after an update."""
@@ -483,7 +484,7 @@ def chow_answer(request: Request, rid: str, approve: int = Form(0), mid: str = D
 @app.post("/chow/assign")
 def chow_assign(request: Request, date: str = Form(...), member: str = Form(""), mid: str = Depends(chow_leader)):
     dt.date.fromisoformat(date)
-    return chow_change(request, lambda s: chow.assign(archive.club, s, date, member or None, mid, base_url(request)))
+    return chow_change(request, lambda s: chow.assign(archive.club, s, date, owner_id(member), mid, base_url(request)))
 
 
 @app.post("/chow/none")
@@ -501,7 +502,7 @@ def chow_swap(request: Request, a: str = Form(...), b: str = Form(...), mid: str
 def chow_record(request: Request, date: str = Form(...), status: str = Form(...), covered_by: str = Form(""),
                 note: str = Form(""), next: str = Form("/chow/history"), mid: str = Depends(leader)):
     def run(s):
-        chow.record(archive.club, s, date, status, mid, covered_by or None, note)
+        chow.record(archive.club, s, date, status, mid, owner_id(covered_by), note)
         return {"section": chow.minutes_section(archive.club, s, chow.history(), date)}  # for the console
     return chow_change(request, run, back=_safe_next(next))
 

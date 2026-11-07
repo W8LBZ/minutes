@@ -156,3 +156,15 @@ ol.rotlist > li.next { background: #eaf2dc; box-shadow: inset 4px 0 0 #5b7a2f; }
 .rot-panel .weeks { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; margin: .2rem 0 .4rem; font-size: .92rem; }
 .rot-panel label.wk { display: inline-flex; gap: .25rem; align-items: center; font-weight: normal; flex-direction: row; margin: 0; }
 .rot-panel > form.inline { display: block; margin-top: .7rem; }
+/* Chow schedule and past nights: the same list look as the rotation */
+.nights .dateblk { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 3.2rem; min-height: 2.7rem;
+  border-radius: .55rem; background: #eef1e6; line-height: 1.05; }
+.nights .dateblk b { font-size: 1.15rem; } .nights .dateblk small { font-size: .7rem; color: #667; white-space: nowrap; }
+ol.nights > li { grid-template-columns: 3.4rem 1fr auto; align-items: center; }
+ol.nights > li.mine { background: #eaf2dc; box-shadow: inset 4px 0 0 #5b7a2f; } ol.nights > li.mine .dateblk { background: #5b7a2f; color: #fff; }
+ol.nights > li.mine .dateblk small { color: #e8efdc; } ol.nights > li.none .dateblk { opacity: .55; }
+ol.nights > li.tonight { box-shadow: inset 4px 0 0 #c48a12; }
+.chip.ok { background: #e2f1d8; color: #2f5a1f; }
+form.swapcard { max-width: 44rem; } .swapicon { font-size: 1.2rem; color: #556; }
+ul.chowlog { max-width: 44rem; max-height: none; }
+form.modern input[name=note] { font: inherit; font-weight: normal; border: 1px solid #cfd3c4; border-radius: .55rem; padding: .55rem .7rem; }
