@@ -10,7 +10,8 @@
 {% set ev = [] %}{% for e in x.history %}{% set _ = ev.append({'at': e.at, 'e': e}) %}{% endfor %}
 {% for c in x.comments or [] %}{% set _ = ev.append({'at': c.at, 'c': c}) %}{% endfor %}
 <ul class="timeline">{% for t in ev|sort(attribute='at', reverse=True) %}<li>
-  <span class="muted small">{{ t.at|tsfull }}{% set who = (t.e or t.c).by %}{% if who %} · {{ club.short(who) }}{% endif %}{% if t.e and t.e.meeting %} · at the <a href="/meetings/{{ t.e.meeting }}">{{ fmt(t.e.meeting) }}</a> meeting{% endif %}</span>
+  <div class="tl-head">{% set who = (t.e or t.c).by %}{% if who %}<span class="chip">👤 <a href="/members/{{ who }}">{{ club.short(who) }}</a></span>{% endif %}
+    <span class="muted small">{{ t.at|tsfull }}{% if t.e and t.e.meeting %} · at the <a href="/meetings/{{ t.e.meeting }}">{{ fmt(t.e.meeting) }}</a> meeting{% endif %}</span></div>
   {% if t.c %}<div class="tl-comment">💬 {{ t.c.text }}</div>
   {% else %}<div>{{ t.e.what|capitalize }}</div>{% for f, ov in (t.e.changes or {}).items() %}<div class="change small"><b>{{ f }}:</b> <s class="muted">{{ ov[0] or '(none)' }}</s> → {{ ov[1] or '(none)' }}</div>{% endfor %}{% endif %}
 </li>{% endfor %}</ul>

@@ -103,7 +103,10 @@ button.act { font: inherit; font-size: .88rem; padding: .25rem .8rem; border: 1p
 button.act:hover { background: #eef2e6; } button.act.on { background: #2f3b1f; color: #fff; border-color: #2f3b1f; }
 .panel { margin-top: .7rem; padding-top: .7rem; border-top: 1px solid #eceee6; }
 .timeline { list-style: none; padding: 0; margin: 0; max-height: 22rem; overflow-y: auto; }
-.timeline li { padding: .35rem 0 .35rem .8rem; border-left: 2px solid #dfe3d4; margin-left: .3rem; }
+.timeline li { padding: .5rem .75rem; border-radius: .5rem; margin: .15rem 0; }
+.timeline li:nth-child(odd) { background: #f4f6ef; } .timeline li:nth-child(even) { background: #fff; }
+.tl-head { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .2rem; }
+.timeline li:nth-child(odd) .chip { background: #e4e9d9; }
 .tl-comment { white-space: pre-wrap; }
 button.linkbtn { background: none; border: 0; color: #667; cursor: pointer; font: inherit; font-size: .85rem; padding: 0 .2rem; }
 button.linkbtn.more { color: #2f5a1f; margin-bottom: .2rem; }
