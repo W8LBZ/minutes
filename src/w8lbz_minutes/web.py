@@ -979,14 +979,21 @@ def about(request: Request):
     return page(request, "about.html", deps=dependencies(), changelog=changelog, license=_license("w8lbz-minutes"))
 
 
-@app.get("/preview/outbox", response_class=HTMLResponse)
-def preview_outbox(request: Request):
-    """Preview mode only: the emails the app would have sent."""
-    p = DATA / "preview-outbox.jsonl"
-    if not PREVIEW or not archive.club.is_admin(request.state.real_member):
+@app.get("/admin/email", response_class=HTMLResponse)
+def email_log(request: Request, mid: str = Depends(real_me)):
+    """Admins: every email the app sent, or held back in test mode, newest first. On a preview, its outbox."""
+    if not archive.club.is_admin(mid):
         raise HTTPException(404)
-    mail = [json.loads(line) for line in p.read_text().splitlines()][::-1] if p.exists() else []
-    return page(request, "outbox.html", mail=mail)
+    if not admin_mode(request) and not PREVIEW:  # bodies can hold members' contact details
+        return RedirectResponse("/admin/confirm?next=/admin/email", status_code=303)
+    p = DATA / ("preview-outbox.jsonl" if PREVIEW else "email-log.jsonl")
+    mail = [json.loads(line) for line in p.read_text().splitlines() if line.strip()][::-1][:300] if p.exists() else []
+    return page(request, "outbox.html", mail=mail, test_mode=archive.club.email_only_to() is not None)
+
+
+@app.get("/preview/outbox")
+def preview_outbox():
+    return RedirectResponse("/admin/email", status_code=303)
 
 
 @app.get("/links", response_class=HTMLResponse)

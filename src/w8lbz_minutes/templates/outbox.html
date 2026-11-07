@@ -1,10 +1,15 @@
-{% extends "base.html" %}{% block title %}Preview outbox{% endblock %}{% block body %}
-<h1>Preview outbox</h1>
-<p class="muted">Emails this preview would have sent, newest first. None of them left this machine. "Withheld" shows who email test mode (<code>email.only_to</code>) would skip on the live site.</p>
+{% extends "base.html" %}{% block title %}{{ 'Preview outbox' if PREVIEW else 'Email log' }}{% endblock %}{% block body %}
+{% if PREVIEW %}<h1>Preview outbox</h1>
+<p class="muted">Emails this preview would have sent, newest first. None of them left this machine. "Held back" shows who email test mode (<code>email.only_to</code>) would skip on the live site.</p>
+{% else %}<h1>Email log</h1>
+<p class="muted">Every email the app sent or held back, newest first (the last 300).
+{% if test_mode %}<b>Test mode is on:</b> only the addresses in <code>email.only_to</code> get mail; everyone else is listed as held back.{% else %}Test mode is off: everyone on the roster gets mail.{% endif %}
+Admins only, since messages can include members' contact details.</p>{% endif %}
 {% for e in mail %}<article class="mail">
   <div class="muted small">{{ e.at|ts }}{% if e.reply_to %} · Reply-To {{ e.reply_to }}{% endif %}{% if e.attachments %} · attached: {{ e.attachments|join(', ') }}{% endif %}</div>
   <h3>{{ e.subject }}</h3>
-  <div><b>To:</b> {{ e.to|join(', ') or '(nobody)' }}{% if e.withheld %} <span class="muted">· withheld: {{ e.withheld|length }}</span>{% endif %}</div>
+  <div><b>To:</b> {{ e.to|join(', ') or '(nobody)' }}{% if e.status and e.status != 'sent' %} <span class="badge warn">{{ e.status }}</span>{% endif %}</div>
+  {% if e.withheld %}<details><summary class="muted small">Held back from {{ e.withheld|length }} by test mode</summary><div class="small">{{ e.withheld|join(', ') }}</div></details>{% endif %}
   <pre>{{ e.body }}</pre>
 </article>{% else %}<p class="muted">Nothing yet.</p>{% endfor %}
 {% endblock %}

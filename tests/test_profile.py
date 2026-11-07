@@ -247,13 +247,13 @@ def test_admin_mode(tmp_path, monkeypatch):
     assert [(e["on"], e.get("confirmed_by")) for e in log if "on" in e] == [(True, "email"), (False, None)]
 
     monkeypatch.setattr(web, "PREVIEW", "some-branch")
-    assert c.get("/preview/outbox").status_code == 200                    # the preview outbox is for admins
+    assert c.get("/admin/email").status_code == 200                       # the preview outbox is for admins
 
     c.cookies.set(web.COOKIE, a.new_session("kd8ccc"))                    # not an admin: can't turn it on
     assert c.post("/admin/mode", data={"on": 1}).status_code == 403
     assert c.get("/admin/confirm").status_code == 403 and c.post("/admin/confirm/email").status_code == 403
     assert "Turn on admin mode" not in c.get("/links").text
-    assert c.get("/preview/outbox").status_code == 404
+    assert c.get("/admin/email").status_code == 404
     assert "Sign-in &amp; passkeys" not in c.get("/links").text           # it's a tab of Your profile now
     assert "Sign-in &amp; passkeys" in c.get("/profile").text and "Your details" in c.get("/account").text
 
@@ -311,3 +311,29 @@ def test_view_as_is_read_only_and_needs_admin_mode(tmp_path, monkeypatch):
     assert "Viewing the app as" not in c.get("/links").text
     log = [json.loads(x) for x in (tmp_path / "admin-log.jsonl").read_text().splitlines()]
     assert [e.get("view_as") for e in log if "view_as" in e] == ["bob", None, "pat"]
+
+
+def test_live_email_log_records_sent_and_held_back(tmp_path, monkeypatch):
+    from w8lbz_minutes import auth as auth_mod
+    monkeypatch.setattr(auth_mod, "PREVIEW", None)
+    monkeypatch.setattr(auth_mod, "DATA", tmp_path)
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def starttls(self): pass
+        def login(self, u, p): pass
+        def send_message(self, m): sent.append(m["To"])
+    monkeypatch.setattr(auth_mod.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setenv("W8LBZ_SMTP_USER", "club@example.org")
+    monkeypatch.setenv("W8LBZ_SMTP_PASSWORD", "pw")
+    assert auth_mod.send_email(["jim@example.org", "amy@example.org"], "Minutes", "body", only_to={"jim@example.org"}) == 1
+    assert auth_mod.send_email("amy@example.org", "Reminder", "body", only_to={"jim@example.org"}) == 0
+    log = [json.loads(x) for x in (tmp_path / "email-log.jsonl").read_text().splitlines()]
+    assert sent == ["jim@example.org"]
+    assert [(e["subject"], e["status"], e["to"], e["withheld"]) for e in log] == [
+        ("Minutes", "sent", ["jim@example.org"], ["amy@example.org"]),
+        ("Reminder", "held back (test mode)", [], ["amy@example.org"])]
+    assert oct((tmp_path / "email-log.jsonl").stat().st_mode)[-3:] == "600"
