@@ -265,10 +265,16 @@ def owner_id(value: str | None) -> str | None:
     return hits[0]
 
 
-def _may_edit_item(request: Request, s: dict, iid: str) -> None:
-    """Leaders change any item; a member can update the ones they own."""
-    if not (can_lead_now(request) or business.get(s, iid)["owner"] == request.state.member):
-        raise ValueError("Only a leader or the item's owner can change it.")
+def manages_business(request: Request, meeting: str = "") -> bool:
+    """Who changes any business item: officers (and admins in admin mode) on the Business page, and whoever
+    leads a meeting from its console (`meeting` set). Minutes editors don't get it on the Business page."""
+    return privileged(request) or bool(meeting and can_lead_now(request))
+
+
+def _may_edit_item(request: Request, s: dict, iid: str, meeting: str = "") -> None:
+    """Officers (or the meeting's leader) change any item; a member can update the ones they own."""
+    if not (manages_business(request, meeting) or business.get(s, iid)["owner"] == request.state.member):
+        raise ValueError("Only an officer or the item's owner can change it.")
 
 
 @app.get("/business", response_class=HTMLResponse)
@@ -280,7 +286,7 @@ def business_page(request: Request, tab: str = "open", error: str = "", note: st
     done = sorted((x for x in items if x["status"] == "done"), key=lambda x: x["closed"], reverse=True)[:50]
     members = sorted((m for m in archive.club.members.values() if m.status.lower() not in ("inactive", "silent key")),
                      key=lambda m: (m.last, m.first))
-    leader_ = can_lead_now(request)
+    leader_ = manages_business(request)
     pending = [g for g in s["suggestions"] if g["status"] == "pending"] if leader_ else []
     submitted = [m for m in archive.meetings if m.status != "draft"][:6]
     my_notes = [n for n in s["notes"] if n["by"] == mid and n["status"] == "pending"]
@@ -329,7 +335,7 @@ def followups_after_submit(slug: str) -> None:
 
 
 @app.post("/business/suggest")
-def business_suggest(request: Request, meeting: str = Form(...), mid: str = Depends(leader)):
+def business_suggest(request: Request, meeting: str = Form(...), mid: str = Depends(officer)):
     if not ai.configured(archive.club):
         raise HTTPException(404)
     get_meeting(meeting)
@@ -342,21 +348,21 @@ def business_suggest(request: Request, meeting: str = Form(...), mid: str = Depe
 
 @app.post("/business/suggestions/{sid}/accept")
 def suggestion_accept(request: Request, sid: str, text: str = Form(""), owner: str = Form(""), due: str = Form(""),
-                      mid: str = Depends(leader)):
+                      mid: str = Depends(officer)):
     return business_change(request, lambda s: business.accept_suggestion(s, sid, mid, text or None, owner_id(owner) or "", due),
                            back="/business?tab=suggestions")
 
 
 @app.post("/business/suggestions/{sid}/dismiss")
-def suggestion_dismiss(request: Request, sid: str, mid: str = Depends(leader)):
+def suggestion_dismiss(request: Request, sid: str, mid: str = Depends(officer)):
     return business_change(request, lambda s: business.dismiss_suggestion(s, sid, mid), back="/business?tab=suggestions")
 
 
 @app.post("/business/add")
 def business_add(request: Request, text: str = Form(...), owner: str = Form(""), due: str = Form(""),
                  agenda: str = Form(""), meeting: str = Form(""), mid: str = Depends(me)):
-    if not can_lead_now(request):
-        raise HTTPException(403, "Only leaders can add business items.")
+    if not manages_business(request, meeting):
+        raise HTTPException(403, "Only officers, or the meeting's leader in the console, can add business items.")
     return business_change(request, lambda s: business.add(s, text, mid, owner_id(owner), due, agenda,
                                                            opened=meeting or None), meeting,
                            back="/business?note=Added." if not meeting else "/business")
@@ -365,10 +371,11 @@ def business_add(request: Request, text: str = Form(...), owner: str = Form(""),
 @app.post("/business/{iid}/edit")
 async def business_edit(request: Request, iid: str, mid: str = Depends(me)):
     form = await request.form()
-    allowed = ("text", "owner", "due", "agenda") if can_lead_now(request) else ("text", "due")  # owners: text and due
+    meeting = form.get("meeting", "")
+    allowed = ("text", "owner", "due", "agenda") if manages_business(request, meeting) else ("text", "due")  # owners
     fields = {k: form.get(k) for k in allowed if k in form}
     def run(s):
-        _may_edit_item(request, s, iid)
+        _may_edit_item(request, s, iid, meeting)
         if "owner" in fields:
             fields["owner"] = owner_id(fields["owner"])
         business.edit(s, iid, mid, meeting=form.get("meeting") or None, **fields)
@@ -383,7 +390,7 @@ def business_comment(request: Request, iid: str, text: str = Form(...), mid: str
 
 @app.post("/business/{iid}/comments/{cid}/delete")
 def business_comment_delete(request: Request, iid: str, cid: str, mid: str = Depends(me)):
-    return business_change(request, lambda s: business.delete_comment(s, iid, cid, mid, can_lead_now(request)),
+    return business_change(request, lambda s: business.delete_comment(s, iid, cid, mid, privileged(request)),
                            back=f"/business#i{iid}")
 
 
@@ -410,7 +417,7 @@ def business_note_status(request: Request, nid: str, status: str, meeting: str =
 @app.post("/business/{iid}/done")
 def business_done(request: Request, iid: str, done: int = Form(1), meeting: str = Form(""), mid: str = Depends(me)):
     def run(s):
-        _may_edit_item(request, s, iid)
+        _may_edit_item(request, s, iid, meeting)
         business.close(s, iid, mid, meeting or None) if done else business.reopen(s, iid, mid)
     return business_change(request, run, meeting, back="/business?tab=done" if done else f"/business#i{iid}")
 
