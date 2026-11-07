@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from w8lbz_minutes import chow, membership, roster
+from w8lbz_minutes import chow, membership, profile, roster
 from w8lbz_minutes.club import Club
 from w8lbz_minutes.roster import Sheet
 
@@ -26,6 +26,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(roster, "PREVIEW", "test")
     monkeypatch.setattr(roster, "DATA", tmp_path)
     monkeypatch.setattr(chow, "DATA", tmp_path)
+    monkeypatch.setattr(profile, "DATA", tmp_path)
     monkeypatch.setattr(roster, "_sheet", lambda: (_ for _ in ()).throw(AssertionError("real sheet used")))
     sent = []
     monkeypatch.setattr(membership.auth, "send_email", lambda to, subject, body, **kw: sent.append((to, subject)))
@@ -52,9 +53,17 @@ def test_add_member_writes_rows_and_updates_the_app(env):
     assert chow.load()["pending"] == ["kd8new"]                  # waits to be added to the chow rotation
     assert sent == [(["jane@example.org"], "New member: Ann New")]  # the Secretary is told
     with pytest.raises(ValueError):
-        membership.add_member(club, {"first": "Ann", "last": "Again", "callsign": "KD8NEW"}, by="kd8bbb", sheet=sheet)
+        membership.add_member(club, {"first": "Ann", "last": "Again", "callsign": "KD8NEW", "license_class": "General"},
+                              by="kd8bbb", sheet=sheet)
+    e = profile.history()[0]
+    assert e["added"] and e["member"] == "kd8new" and e["by"] == "kd8bbb" and e["new"]["callsign"] == "KD8NEW"
+    with pytest.raises(ValueError):
+        profile.undo(club, e["id"], by="kd8aaa")  # an addition isn't undone from Recent changes
     for bad in ({"first": "Ann"}, {"first": "A", "last": "B", "callsign": "not a call"},
-                {"first": "A", "last": "B", "email": "nope"}, {"first": "A", "last": "B", "joined": "soon"}):
+                {"first": "A", "last": "B", "callsign": "KD8XYZ"},  # no license class: members must be licensed
+                {"first": "A", "last": "B", "license_class": "General"},  # no callsign
+                {"first": "A", "last": "B", "callsign": "KD8XYZ", "license_class": "General", "email": "nope"},
+                {"first": "A", "last": "B", "callsign": "KD8XYZ", "license_class": "General", "joined": "soon"}):
         with pytest.raises(ValueError):
             membership.clean(bad)
 
@@ -79,7 +88,8 @@ def test_only_roster_keepers_can_add(env, monkeypatch):
     assert c.get("/roster/add").status_code == 403 and "Add a member" not in c.get("/roster").text
     who["id"] = "kd8bbb"  # the Treasurer
     assert "Add a member" in c.get("/roster").text and c.get("/roster/add").status_code == 200
-    r = c.post("/roster/add", data={"first": "Ann", "last": "New", "callsign": "KD8NEW"}, follow_redirects=False)
+    r = c.post("/roster/add", data={"first": "Ann", "last": "New", "callsign": "KD8NEW", "license_class": "Technician"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/members/kd8new?added=1"
     assert "Added to the roster" in c.get(r.headers["location"]).text
-    assert "already on the roster" in c.post("/roster/add", data={"first": "X", "last": "Y", "callsign": "KD8NEW"}).text
+    assert "Added to the roster" in c.get("/roster/changes").text and "Tom Till" in c.get("/roster/changes").text
+    assert "already on the roster" in c.post("/roster/add", data={"first": "X", "last": "Y", "callsign": "KD8NEW", "license_class": "General"}).text

@@ -17,7 +17,7 @@ from .club import DATA, ROSTER_CACHE, Club
 from .roster import EDITABLE, Sheet
 
 log = logging.getLogger("w8lbz.profile")
-LABELS = {"email": "Email", "phone": "Phone", "address": "Address", "birthday": "Birthday", "share": "Shared with members"}
+LABELS = {"callsign": "Callsign", "license_class": "License class", "joined": "Joined", "email": "Email", "phone": "Phone", "address": "Address", "birthday": "Birthday", "share": "Shared with members"}
 
 
 def log_path():
@@ -45,6 +45,12 @@ def _append(entry: dict) -> None:
     with p.open("a") as f:
         f.write(json.dumps(entry) + "\n")
     os.chmod(p, 0o600)
+
+
+def log_added(mid: str, by: str, fields: dict) -> None:
+    """A new member added from the Roster page; shown in Recent changes (it can't be undone from there)."""
+    _append({"id": secrets.token_hex(6), "at": int(time.time()), "member": mid, "by": by,
+             "added": True, "old": {}, "new": fields})
 
 
 def _apply_locally(club: Club, mid: str, new: dict[str, str]) -> None:
@@ -87,7 +93,7 @@ def change(club: Club, mid: str, new: dict[str, str], by: str, sheet: Sheet | No
 def undo(club: Club, change_id: str, by: str, sheet: Sheet | None = None, url: str = "") -> dict:
     """Put back the old values of a change, unless the member has changed those fields again since."""
     e = next((x for x in history(10_000) if x["id"] == change_id), None)
-    if not e or e["undone"] or e.get("undoes"):
+    if not e or e["undone"] or e.get("undoes") or e.get("added"):
         raise ValueError("That change can't be undone.")
     m = club.members[e["member"]]
     if any(as_cell(f, getattr(m, f)) != v for f, v in e["new"].items()):

@@ -35,6 +35,8 @@ The club's Google calendars ("Meetings & Events", "Chow", "Community Events", "P
 ## Members and roster management
 The Google Sheet stays the source of truth; the app writes values back to it (values only, never formatting or structure).
 - **Celebrations:** birthdays (opt-in) and membership anniversaries shown in the console on meeting night ("Happy birthday, …", "5 years as a member").
+- **Guest to member:** a fuller process (application, vote, initiation fee and dues) behind today's "Add a member".
+- **Associate members** (GMRS or unlicensed), only if the bylaws add them; today a member must hold an amateur license.
 - **Officer history:** when someone starts or ends an office, recorded as Membership Log events, so the app can show who held each office when.
 - **Admin page for officers:** sync the roster now, email test mode on/off, delete test minutes, review imported minutes.
 

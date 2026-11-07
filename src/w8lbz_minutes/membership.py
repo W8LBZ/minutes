@@ -11,7 +11,7 @@ import json
 import logging
 import re
 
-from . import auth, chow
+from . import auth, chow, profile
 from .club import ROSTER_CACHE, Club
 from .roster import Sheet, SheetError
 
@@ -37,11 +37,14 @@ def clean(form: dict) -> dict:
     f["address"] = "\n".join(line.strip() for line in f["address"].splitlines() if line.strip())
     if not f["first"] or not f["last"]:
         raise ValueError("First and last name are both needed.")
-    if f["callsign"] and not re.fullmatch(r"[A-Z0-9]{3,7}", f["callsign"]):
+    # Membership needs an amateur license (no associate members in the bylaws yet).
+    if not f["callsign"] or not f["license_class"]:
+        raise ValueError("A callsign and license class are needed: members must be licensed.")
+    if not re.fullmatch(r"[A-Z0-9]{3,7}", f["callsign"]):
         raise ValueError(f"{f['callsign']} doesn't look like a callsign.")
     if f["email"] and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", f["email"]):
         raise ValueError(f"{f['email']} doesn't look like an email address.")
-    if f["license_class"] not in CLASSES + ("",):
+    if f["license_class"] not in CLASSES:
         raise ValueError("Unknown license class.")
     try:
         f["joined"] = dt.date.fromisoformat(f["joined"]).isoformat() if f["joined"] else dt.date.today().isoformat()
@@ -90,6 +93,8 @@ def add_member(club: Club, form: dict, by: str, sheet: Sheet | None = None, url:
         s["pending"].append(mid)
         chow.save(s)
 
+    # Who added them: in Recent changes (here), the Membership Log note (sheet) and the Secretary's email.
+    profile.log_added(mid, by, {k: f[k] for k in ("callsign", "email", "phone", "address", "license_class", "joined") if f[k]})
     log.info("new member %s (%s) added by %s", name, mid, by)
     to = [club.members[x].email for x in club.secretaries if x != by and club.members[x].email]
     if to:
