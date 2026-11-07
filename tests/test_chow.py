@@ -169,7 +169,13 @@ def test_chow_page_permissions(env, tmp_path, monkeypatch):
     c.post(f"/chow/requests/{rid}/answer", data={"approve": 1})
     assert chow.load()["nights"]["2099-01-01"]["member"] == "bob"
     assert c.get("/chow/rotation").status_code == 404                    # a member has only the schedule
-    who["id"] = "sec"  # an officer can lead, so can edit
+    club.members["cal"].minutes_editor = True  # can lead a meeting and record chow, but not change the schedule
+    who["id"] = "cal"
+    assert "Fill the schedule" not in c.get("/chow").text and c.get("/chow/rotation").status_code == 404
+    assert c.post("/chow/assign", data={"date": "2099-01-08", "member": "cal"}).status_code == 403
+    assert c.post("/chow/record", data={"date": "2099-01-01", "status": "provided"},
+                  headers={"Accept": "application/json"}).status_code == 200
+    who["id"] = "sec"  # an officer can change the schedule
     assert "Swap two nights" in c.get("/chow").text and "Fill the schedule" in c.get("/chow/rotation").text
     assert "Past nights" in c.get("/chow/history").text
     assert c.post("/chow/assign", data={"date": "2099-01-08", "member": "cal"}, follow_redirects=False).status_code == 303
