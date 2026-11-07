@@ -1008,8 +1008,11 @@ def member(request: Request, mid: str):
 
 
 @app.get("/roster", response_class=HTMLResponse)
-def roster(request: Request, status: str = "Active", p: str = Query("1", alias="page"), per: str = ""):
-    """Everyone on the roster; contact details are on each member's own page."""
+def roster(request: Request, status: str = "Active", p: str = Query("1", alias="page"), per: str = "", view: str = ""):
+    """Everyone on the roster, as a list or as cards (remembered in a cookie); contact details are on member pages."""
+    view = view if view in ("list", "cards") else request.cookies.get("roster_view", "list")
+    if view not in ("list", "cards"):
+        view = "list"
     def since(m):
         try:
             return dt.date.fromisoformat(m.member_since) if m.member_since else None
@@ -1019,10 +1022,12 @@ def roster(request: Request, status: str = "Active", p: str = Query("1", alias="
     ms = sorted(archive.club.members.values(), key=lambda m: (m.status.lower() in gone, m.last, m.first))
     statuses = sorted({m.status for m in ms}, key=lambda x: (x != "Active", x))
     shown = [m for m in ms if status == "all" or m.status == status]
-    return page(request, "roster.html", pg=paginate([(m, since(m)) for m in shown], p, per, 50),
-                active=sum(m.status.lower() not in gone for m in ms), statuses=statuses, status=status,
-                is_officer=privileged(request),
-                can_add=archive.club.keeps_roster(request.state.member) or admin_mode(request))
+    response = page(request, "roster.html", pg=paginate([(m, since(m)) for m in shown], p, per, 50),
+                    active=sum(m.status.lower() not in gone for m in ms), statuses=statuses, status=status,
+                    is_officer=privileged(request), view=view,
+                    can_add=archive.club.keeps_roster(request.state.member) or admin_mode(request))
+    response.set_cookie("roster_view", view, max_age=365 * 86400, samesite="lax", httponly=True)
+    return response
 
 
 @app.get("/bylaws", response_class=HTMLResponse)

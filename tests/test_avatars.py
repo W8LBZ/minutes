@@ -67,3 +67,19 @@ def test_routes(env, tmp_path, monkeypatch):
     who["id"] = "sec"
     c.post("/members/amy/photo/remove")
     assert not avatars.path("amy").exists() and c.get("/avatars/amy.jpg").status_code == 404
+
+
+def test_roster_card_view_is_remembered(env, tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from w8lbz_minutes import web
+    from w8lbz_minutes.club import Club
+    from w8lbz_minutes.store import Archive
+    club = Club(FIX / "test-club.yaml", roster=[{"id": "amy", "first": "Amy", "last": "Able", "role": "Secretary"}])
+    monkeypatch.setattr(web, "archive", Archive(tmp_path, club))
+    monkeypatch.setattr(web.authn, "member_for", lambda token: "amy")
+    c = TestClient(web.app)
+    assert '<table class="list">' in c.get("/roster").text                          # a list by default
+    page = c.get("/roster?view=cards").text
+    assert 'class="membercard"' in page and "Secretary" in page and '<table class="list">' not in page
+    assert 'class="membercard"' in c.get("/roster").text                            # remembered
+    assert '<table class="list">' in c.get("/roster?view=list").text

@@ -4,7 +4,20 @@
 <p class="muted">{{ active }} active members. From the club roster sheet, synced daily. Click a name for contact details{% if not is_officer %} the member has shared{% endif %} and their meeting history.</p>
 <form class="filter"><label>Status <select name="status" onchange="this.form.submit()">
   {% for st in statuses %}<option {{ 'selected' if st == status }}>{{ st }}</option>{% endfor %}<option value="all" {{ 'selected' if status == 'all' }}>Everyone</option>
-</select></label> {{ pager.size(pg) }}<noscript><button class="btn small">Show</button></noscript></form>
+</select></label> {{ pager.size(pg) }}<input type="hidden" name="view" value="{{ view }}"><noscript><button class="btn small">Show</button></noscript>
+  <span class="viewswitch" role="group" aria-label="View">
+    <a href="{{ request.url.include_query_params(view='list') }}" class="{{ 'on' if view == 'list' }}" title="List view" aria-label="List view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+    <a href="{{ request.url.include_query_params(view='cards') }}" class="{{ 'on' if view == 'cards' }}" title="Card view" aria-label="Card view"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></a>
+  </span></form>
+{% if view == 'cards' %}
+<div class="membergrid">{% for m, since in pg.rows %}<a class="membercard" href="/members/{{ m.id }}">
+  {{ avatar(m.id, 'lg') }}
+  <div class="mc-name">{{ m.name }}</div>
+  {% if m.callsign %}<div class="cs mc-call">{{ m.callsign }}</div>{% endif %}
+  <div class="mc-meta">{% if m.license_class %}<span class="chip">{{ m.license_class }}</span>{% endif %}{% if m.role %}<span class="chip ok">{{ m.role }}</span>{% endif %}{% if m.status != 'Active' %}<span class="chip warn">{{ m.status }}</span>{% endif %}</div>
+  {% if since %}<div class="muted small">Member since {{ since|listdate }}</div>{% endif %}
+</a>{% else %}<p class="muted">Nobody with that status.</p>{% endfor %}</div>
+{% else %}
 <table class="list"><thead><tr><th>Name</th><th>Callsign</th><th>License</th><th>Office</th><th>Status</th><th>Member since</th></tr></thead>
 <tbody>{% for m, since in pg.rows %}<tr>
 <td data-sort="{{ m.last|lower }} {{ m.first|lower }}"><a href="/members/{{ m.id }}" class="withavatar">{{ avatar(m.id, 'sm') }}{{ m.name }}</a></td><td class="cs">{{ m.callsign or '' }}</td>
@@ -12,5 +25,6 @@
 <td>{% if m.status != 'Active' %}<span class="badge">{{ m.status }}</span>{% else %}Active{% endif %}</td>
 <td data-sort="{{ since or '' }}">{{ since|listdate if since }}</td>
 </tr>{% else %}<tr><td colspan="6" class="muted">Nobody with that status.</td></tr>{% endfor %}</tbody></table>
+{% endif %}
 {{ pager.links(pg, request) }}
 {% endblock %}

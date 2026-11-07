@@ -292,3 +292,18 @@ a.withavatar { display: inline-flex; align-items: center; gap: .55rem; }
 .memberhead { display: flex; gap: 1.1rem; align-items: center; margin-bottom: .6rem; } .memberhead h1 { margin: 0 0 .2rem; }
 .photorow { display: flex; gap: 1.1rem; align-items: center; max-width: 36rem; margin: .4rem 0 1rem; }
 .photorow p.hint { margin: .4rem 0 0; } .photoform { display: inline; } label.filebtn { cursor: pointer; }
+/* roster: list / card switch and member cards */
+.viewswitch { display: inline-flex; background: var(--surface-3); border-radius: .55rem; padding: .2rem; gap: .15rem; margin-left: auto; }
+.viewswitch a { display: grid; place-items: center; width: 2.1rem; height: 1.9rem; border-radius: .4rem; color: var(--muted); }
+.viewswitch a:hover { color: var(--text); } .viewswitch a.on { background: var(--surface); color: var(--accent-text); box-shadow: var(--shadow); }
+.viewswitch svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.viewswitch a:last-child svg { fill: currentColor; stroke: none; }
+form.filter { width: 100%; }
+.membergrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: 1rem; margin: .6rem 0 1.2rem; }
+.membercard { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .3rem; padding: 1.2rem .9rem 1rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  color: var(--text); text-decoration: none; transition: transform .15s, border-color .15s; }
+.membercard:hover { border-color: var(--accent); transform: translateY(-2px); color: var(--text); }
+.membercard .avatar.lg { width: 4.5rem; height: 4.5rem; font-size: 1.5rem; margin-bottom: .3rem; }
+.mc-name { font-weight: 600; font-size: 1.05rem; } .mc-call { color: var(--muted); font-size: .88rem; }
+.mc-meta { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: center; margin: .2rem 0; }
