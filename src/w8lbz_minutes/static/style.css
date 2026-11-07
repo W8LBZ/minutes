@@ -312,3 +312,4 @@ form.profile .fixedrow { display: flex; flex-wrap: wrap; gap: .8rem; }
 form.profile .fixedrow label { flex: 1 1 9rem; margin: .2rem 0 .5rem; font-weight: 600; font-size: .9rem; }
 form.profile input[readonly] { width: 100%; background: var(--surface-3); color: var(--muted); border-style: dashed; cursor: default; }
 form.profile input[readonly]:focus { box-shadow: none; border-color: var(--border-strong); }
+@media (max-width: 1150px) { nav.top input[type=search] { width: 7rem; } nav.top .brand { margin-right: .3rem; } }
