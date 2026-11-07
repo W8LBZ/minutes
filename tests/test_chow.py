@@ -191,3 +191,11 @@ def test_new_members_join_at_the_end_of_the_round(env):
     assert s["order"] == ["amy", "bob", "sec", "cal", "dee", "old"] and chow.next_up(club, s) == "cal"
     chow.generate(club, s, dt.date(2027, 2, 18), "sec", today=THU)
     assert [s["nights"][d]["member"] for d in sorted(s["nights"])] == ["amy", "bob", "cal", "dee", "amy", "bob", "sec"]
+
+
+def test_skip_next_turn(env):
+    club, s, _ = env
+    chow.set_constraints(s, "bob", [], [], "covered his turn early", "sec", skip=1)
+    filled = chow.generate(club, s, dt.date(2027, 2, 4), "sec", today=THU - dt.timedelta(days=3))
+    assert [s["nights"][d]["member"] for d in filled] == ["amy", "cal", "dee", "amy", "bob"]  # Bob passed over once only
+    assert s["constraints"]["bob"]["skip"] == 0 and chow.history()[0]["skipped"] == ["bob"]

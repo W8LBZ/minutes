@@ -149,6 +149,7 @@ def generate(club: Club, s: dict, until: dt.date, by: str, today: dt.date | None
     start = max(today, dt.date.fromisoformat(assigned[-1]) + dt.timedelta(days=1)) if assigned else today
     i = order.index(next_up(club, s))
     waiting: list[str] = []  # skipped by a constraint, first in line for the next night they can do
+    skipped: list[str] = []  # turns passed over on purpose ("skip their next turn")
     filled = []
     for d in meeting_nights(club, start, until):
         x = s["nights"].get(d.isoformat())
@@ -161,6 +162,11 @@ def generate(club: Club, s: dict, until: dt.date, by: str, today: dt.date | None
             if pick:
                 break
             cand, i = order[i], (i + 1) % len(order)
+            c = s["constraints"].get(cand) or {}
+            if c.get("skip", 0) > 0:  # e.g. they covered this turn early: pass over them once, no make-up night
+                c["skip"] -= 1
+                skipped.append(cand)
+                continue
             if eligible(club, s, cand, d):
                 pick = cand
             elif club.members.get(cand) and club.members[cand].status.lower() not in ("inactive", "silent key"):
@@ -171,7 +177,7 @@ def generate(club: Club, s: dict, until: dt.date, by: str, today: dt.date | None
         filled.append(d.isoformat())
     if filled:
         s["next"] = order[i] if not waiting else waiting[0]  # whoever's turn comes next
-        _log("generate", by, dates=filled)
+        _log("generate", by, dates=filled, **({"skipped": skipped} if skipped else {}))
     return filled
 
 
@@ -226,9 +232,12 @@ def set_order(s: dict, order: list[str], by: str) -> None:
     _log("order", by, order=s["order"])
 
 
-def set_constraints(s: dict, mid: str, not_weeks: list[int], away: list[list[str]], note: str, by: str) -> None:
+def set_constraints(s: dict, mid: str, not_weeks: list[int], away: list[list[str]], note: str, by: str,
+                    skip: int = 0) -> None:
+    """skip: how many of their coming turns Fill passes over (e.g. they covered one early)."""
     c = {"not_weeks": sorted({w for w in not_weeks if 1 <= w <= 5}),
-         "away": [[a, b] for a, b in away if a and b and a <= b], "note": note.strip()[:120]}
+         "away": [[a, b] for a, b in away if a and b and a <= b], "note": note.strip()[:120],
+         "skip": max(0, min(int(skip or 0), 5))}
     if any(c.values()):
         s["constraints"][mid] = c
     else:

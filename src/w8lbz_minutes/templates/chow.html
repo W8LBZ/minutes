@@ -20,7 +20,7 @@
 
 {% if tab == 'schedule' %}
 <ol class="rotlist nights">{% for d, x in upcoming %}{% set dd = d|isodate %}<li class="{{ 'mine' if x.member == me.id }}{{ ' none' if x.status == 'none' }}{{ ' tonight' if d == today }}">
-  <span class="dateblk"><b>{{ dd.day }}</b><small>{{ dd.strftime('%b') }} · {{ dd.strftime('%a') }}</small></span>
+  <span class="dateblk"><b>{{ dd.day }}</b><small>{{ dd.strftime('%b') }}</small></span>
   <div class="rot-main">
     {% if x.status == 'none' %}<div class="rot-name muted">No chow</div>{% if x.note %}<div class="rot-note">{{ x.note }}</div>{% endif %}
     {% elif x.member %}<div class="rot-name"><a href="/members/{{ x.member }}">{{ club.name(x.member) }}</a>{% if x.member == me.id %} <span class="badge">you</span>{% endif %}{% if d == today %} <span class="badge">tonight</span>{% endif %}</div>
@@ -74,6 +74,7 @@
     {% if c %}<div class="rot-limits">
       {% if c.not_weeks %}<span class="chip">🚫 not the {% for w in c.not_weeks %}{{ ord[w] }}{{ ', ' if not loop.last }}{% endfor %} {{ 'week' if c.not_weeks|length == 1 else 'weeks' }}</span>{% endif %}
       {% for a, b in c.away %}<span class="chip">✈ away {{ fmt(a) }} – {{ fmt(b) }}</span>{% endfor %}
+      {% if c.skip %}<span class="chip">⏭ skips {{ 'their next turn' if c.skip == 1 else 'their next %d turns' % c.skip }}</span>{% endif %}
       {% if c.note %}<div class="rot-note">{{ c.note }}</div>{% endif %}
     </div>{% endif %}
   </div>
@@ -88,6 +89,8 @@
         <label>Away from<input type="date" name="away_from" value="{{ c.away[0][0] if c and c.away }}"></label>
         <label>to<input type="date" name="away_to" value="{{ c.away[0][1] if c and c.away }}"></label>
       </div>
+      <div class="formrow"><label>Skip their next<select name="skip">{% for n in range(0, 4) %}<option value="{{ n }}" {{ 'selected' if (c.skip if c else 0) == n }}>{{ {0: 'no turns', 1: '1 turn', 2: '2 turns', 3: '3 turns'}[n] }}</option>{% endfor %}</select></label>
+        <span class="hint">e.g. they covered a turn early. Fill passes over them that many times, with no make-up night.</span></div>
       <label>Note<textarea name="note" rows="2" maxlength="120" placeholder="e.g. Winters in Florida">{{ c.note if c }}</textarea></label>
       <div class="formrow"><button class="btn small">Save</button> <button type="button" class="btn small ghost" data-close>Cancel</button></div>
     </form>
@@ -102,7 +105,7 @@
 {% elif tab == 'history' %}
 <h2>Past nights</h2>
 <ol class="rotlist nights">{% for d, x in past %}{% set dd = d|isodate %}<li class="{{ 'none' if x.status == 'none' }}">
-  <span class="dateblk"><b>{{ dd.day }}</b><small>{{ dd.strftime('%b') }} · {{ dd.strftime('%a') }}</small></span>
+  <span class="dateblk"><b>{{ dd.day }}</b><small>{{ dd.strftime('%b') }}</small></span>
   <div class="rot-main">
     {% if x.status == 'none' %}<div class="rot-name muted">No chow</div>{% if x.note %}<div class="rot-note">{{ x.note }}</div>{% endif %}
     {% else %}<div class="rot-name">{{ club.name(x.member) if x.member else '(open)' }}</div>
@@ -127,7 +130,7 @@
   {% elif e.action == 'assign' %}{{ fmt(e.date) }}: {{ club.short(e.old) if e.old else '(open)' }} → {{ club.short(e.new) if e.new else '(open)' }}
   {% elif e.action == 'no_chow' %}{{ fmt(e.date) }}: no chow{% if e.note %} ({{ e.note }}){% endif %}
   {% elif e.action == 'record' %}{{ fmt(e.date) }}: {{ {'provided': 'provided', 'missed': 'not provided', 'covered': 'brought by someone else', 'scheduled': 'record cleared'}.get(e.status, e.status) }}{% if e.covered_by %} ({{ club.short(e.covered_by) }}){% endif %}
-  {% elif e.action == 'generate' %}Filled {{ e.dates|length }} nights, {{ fmt(e.dates[0]) }} to {{ fmt(e.dates[-1]) }}
+  {% elif e.action == 'generate' %}Filled {{ e.dates|length }} nights, {{ fmt(e.dates[0]) }} to {{ fmt(e.dates[-1]) }}{% if e.skipped %} (skipped a turn: {% for m in e.skipped %}{{ club.short(m) }}{{ ', ' if not loop.last }}{% endfor %}){% endif %}
   {% elif e.action == 'swap_request' %}{{ club.short(e.members[0]) }} asked {{ club.short(e.members[1]) }} to swap {{ fmt(e.dates[0]) }} / {{ fmt(e.dates[1]) }}
   {% elif e.action == 'order' %}Changed the rotation order
   {% elif e.action == 'constraints' %}Limits for {{ club.short(e.member) }}

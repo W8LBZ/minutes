@@ -168,5 +168,5 @@ ol.nights > li.tonight { box-shadow: inset 4px 0 0 #c48a12; }
 form.swapcard { max-width: 44rem; } .swapicon { font-size: 1.2rem; color: #556; }
 ul.chowlog { max-width: 44rem; max-height: none; }
 form.modern input[name=note] { font: inherit; font-weight: normal; border: 1px solid #cfd3c4; border-radius: .55rem; padding: .55rem .7rem; }
-.nights .dateblk { width: 3.7rem; } ol.nights > li { grid-template-columns: 3.9rem 1fr auto; }
+.nights .dateblk { width: 3.2rem; } ol.nights > li { grid-template-columns: 3.4rem 1fr auto; }
 .rot-name a { color: inherit; text-decoration: none; border-bottom: 1px dotted #9aa38a; } .rot-name a:hover { color: #2f5a1f; }

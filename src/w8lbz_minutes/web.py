@@ -544,7 +544,8 @@ async def chow_constraints(request: Request, mid: str = Depends(chow_leader)):
         raise HTTPException(404)
     weeks = [int(w) for w in form.getlist("not_weeks") if w.isdigit()]
     away = [[form.get("away_from", ""), form.get("away_to", "")]] if form.get("away_from") else []
-    return chow_change(request, lambda s: chow.set_constraints(s, who, weeks, away, form.get("note", ""), mid),
+    skip = int(form.get("skip") or 0) if str(form.get("skip") or "0").isdigit() else 0
+    return chow_change(request, lambda s: chow.set_constraints(s, who, weeks, away, form.get("note", ""), mid, skip),
                        back="/chow/rotation")
 
 
