@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block title %}Chow{% endblock %}{% block body %}
 <h1>Chow schedule</h1>
+{% if leader %}<nav class="tabs">{% for t, label in (('schedule', 'Schedule'), ('rotation', 'Rotation'), ('history', 'Past nights & changes')) %}<a href="/chow{{ '' if t == 'schedule' else '/' + t }}" class="{{ 'on' if tab == t }}">{{ label }}</a>{% endfor %}</nav>{% endif %}
 <p class="muted">Who brings the snack each meeting night. Can't make your night? Ask another member to swap below; they approve or decline here, and you both get an email.
 {% if leader %}Leaders can change the schedule directly; the Secretary keeps it.{% endif %}</p>
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
@@ -17,6 +18,7 @@
 </div>
 {% endfor %}
 
+{% if tab == 'schedule' %}
 <table class="list chow"><thead><tr><th>Night</th><th>Chow</th><th></th></tr></thead><tbody>
 {% for d, x in upcoming %}<tr class="{{ 'mine' if x.member == me.id }}{{ ' none' if x.status == 'none' }}">
   <td data-sort="{{ d }}">{{ fmt(d) }}{% if d == today %} <span class="badge">tonight</span>{% endif %}</td>
@@ -40,23 +42,26 @@
 {% else %}<tr><td colspan="3" class="muted">Nothing scheduled yet.</td></tr>{% endfor %}
 </tbody></table>
 
-{% if leader %}
-<h2>Swap two nights</h2>
+{% if leader %}<h2>Swap two nights</h2>
 <form method="post" action="/chow/swap" class="inline">
   {% for f in ('a', 'b') %}<select name="{{ f }}" aria-label="Night">{% for d, x in upcoming if x.member and x.status != 'none' %}<option value="{{ d }}" {{ 'selected' if loop.index == (1 if f == 'a' else 2) }}>{{ fmt(d) }}: {{ club.short(x.member) }}</option>{% endfor %}</select>{% if f == 'a' %} ⇄ {% endif %}{% endfor %}
   <button class="btn small">Swap</button>
 </form>
 <p class="hint">Both members and the Secretary are emailed. Changes made on a meeting night go into that meeting's minutes.</p>
 
+{% endif %}
+{% elif tab == 'rotation' %}
 <h2>Fill the schedule</h2>
-<form method="post" action="/chow/generate" class="inline">
-  Fill open meeting nights through <input type="date" name="until" value="{{ default_until }}">, continuing the rotation with
-  <select name="next_member">{% for mid in s.order %}<option value="{{ mid }}" {{ 'selected' if mid == next_up }}>{{ club.name(mid) }}</option>{% endfor %}</select>
-  <button class="btn small">Fill</button>
+<form method="post" action="/chow/generate">
+  <p>Fill the open meeting nights through <input type="date" name="until" value="{{ default_until }}"> by continuing the rotation in order.
+  {% if next_up %}<b>{{ club.name(next_up) }}</b> is next.{% endif %}
+  <button class="btn small">Fill</button></p>
+  <details class="edit"><summary>Start with someone else</summary>
+    <select name="next_member"><option value="">{{ club.name(next_up) if next_up else '(next in order)' }}</option>{% for mid in s.order if mid != next_up %}<option value="{{ mid }}">{{ club.name(mid) }}</option>{% endfor %}</select></details>
 </form>
 <p class="hint">Holidays already marked "no chow" are skipped. Someone who can't do a night (see their limits below) keeps their turn and gets the next night they can do.</p>
 
-<h2 id="rotation">Rotation</h2>
+<h2>Rotation</h2>
 <p class="hint">The same order every round; new members go at the bottom.</p>
 <ol class="rotation">{% for mid in s.order %}{% set c = s.constraints.get(mid) %}<li>
   <span class="who"><span class="n">{{ loop.index }}.</span> {{ club.name(mid) }}{% if mid == next_up %} <span class="badge">next</span>{% endif %}</span>
@@ -75,16 +80,17 @@
 <ul class="rotation">{% for mid in s.pending if mid in club.members %}<li><span class="who">{{ club.name(mid) }}</span>
   <form method="post" action="/chow/order" class="inline"><input type="hidden" name="member" value="{{ mid }}"><input type="hidden" name="op" value="add"><button class="btn small ghost">Add at the bottom</button></form></li>{% endfor %}</ul>{% endif %}
 
+{% elif tab == 'history' %}
 <h2>Past nights</h2>
 <table class="list"><thead><tr><th>Night</th><th>Scheduled</th><th>What happened</th></tr></thead><tbody>
 {% for d, x in past %}<tr><td data-sort="{{ d }}">{{ fmt(d) }}</td>
   <td>{% if x.status == 'none' %}<span class="muted">No chow{% if x.note %} ({{ x.note }}){% endif %}</span>{% else %}{{ club.name(x.member) if x.member else '(open)' }}{% endif %}</td>
-  <td>{% if x.status == 'provided' %}✓ provided{% elif x.status == 'missed' %}<b class="missed">✗ missed</b>{% elif x.status == 'covered' %}covered by {{ club.name(x.covered_by) }}{% if x.note %} ({{ x.note }}){% endif %}{% elif x.status != 'none' %}<span class="muted">not recorded</span>{% endif %}
+  <td>{% if x.status == 'provided' %}✓ provided{% if x.note %} ({{ x.note }}){% endif %}{% elif x.status == 'missed' %}<b class="missed">✗ not provided</b>{% elif x.status == 'covered' %}brought by {{ club.name(x.covered_by) }}{% if x.note %} ({{ x.note }}){% endif %}{% elif x.status != 'none' %}<span class="muted">not recorded</span>{% endif %}
     {% if x.member and x.status != 'none' %}<details class="edit"><summary>Record</summary>
       <form method="post" action="/chow/record" class="inline"><input type="hidden" name="date" value="{{ d }}">
-        <select name="status"><option value="provided">Provided</option><option value="missed">Missed</option><option value="covered">Covered by…</option><option value="scheduled">Not recorded</option></select>
-        <select name="covered_by"><option value="">(who covered)</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select>
-        <input name="note" placeholder="note" size="12"><button class="btn small">Save</button></form></details>{% endif %}
+        <select name="status"><option value="provided">Provided</option><option value="missed">Not provided</option><option value="covered">Someone else brought it</option><option value="scheduled">Not recorded</option></select>
+        <select name="covered_by"><option value="">(who brought it)</option>{% for m in members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select>
+        <input name="note" placeholder="what they brought" size="16"><button class="btn small">Save</button></form></details>{% endif %}
   </td></tr>{% endfor %}</tbody></table>
 
 <h2>Recent changes</h2>

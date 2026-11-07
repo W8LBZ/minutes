@@ -223,14 +223,14 @@ def chow_change(request: Request, fn, back: str = "/chow"):
     with _chow_lock:
         s = chow.load()
         try:
-            fn(s)
+            res = fn(s)
         except ValueError as e:
             if request.headers.get("accept", "").startswith("application/json"):
                 return JSONResponse({"error": str(e)}, status_code=409)
             return RedirectResponse(f"{back}{'&' if '?' in back else '?'}error=" + quote(str(e)), status_code=303)
         chow.save(s)
     if request.headers.get("accept", "").startswith("application/json"):
-        return JSONResponse({"ok": True})
+        return JSONResponse({"ok": True, **(res if isinstance(res, dict) else {})})
     return RedirectResponse(back, status_code=303)
 
 
@@ -241,13 +241,16 @@ def chow_leader(request: Request) -> str:
 
 
 @app.get("/chow", response_class=HTMLResponse)
-def chow_page(request: Request, error: str = "", mid: str = Depends(me)):
+@app.get("/chow/{tab}", response_class=HTMLResponse)
+def chow_page(request: Request, tab: str = "schedule", error: str = "", mid: str = Depends(me)):
     s, club = chow.load(), archive.club
     leader = can_edit_chow(request)
+    if tab not in ("schedule", "rotation", "history") or (tab != "schedule" and not leader):
+        raise HTTPException(404)
     members = sorted((m for m in club.members.values() if m.status.lower() not in ("inactive", "silent key")),
                      key=lambda m: (m.last, m.first))
     today = dt.date.today()
-    return page(request, "chow.html", s=s, error=error, leader=leader, members=members,
+    return page(request, "chow.html", s=s, error=error, leader=leader, tab=tab, members=members,
                 upcoming=chow.upcoming(s, n=16), past=chow.past(s, n=16) if leader else [],
                 mine=[d for d, x in chow.upcoming(s, n=60) if x.get("member") == mid and x.get("status") != "none"],
                 asked=[r for r in s["swaps"] if r["status"] == "pending" and mid in (r["with"], r["requester"])],
@@ -285,9 +288,11 @@ def chow_swap(request: Request, a: str = Form(...), b: str = Form(...), mid: str
 
 @app.post("/chow/record")
 def chow_record(request: Request, date: str = Form(...), status: str = Form(...), covered_by: str = Form(""),
-                note: str = Form(""), next: str = Form("/chow"), mid: str = Depends(chow_leader)):
-    return chow_change(request, lambda s: chow.record(archive.club, s, date, status, mid, covered_by or None, note),
-                       back=_safe_next(next))
+                note: str = Form(""), next: str = Form("/chow/history"), mid: str = Depends(chow_leader)):
+    def run(s):
+        chow.record(archive.club, s, date, status, mid, covered_by or None, note)
+        return {"section": chow.minutes_section(archive.club, s, chow.history(), date)}  # for the console
+    return chow_change(request, run, back=_safe_next(next))
 
 
 @app.post("/chow/generate")
@@ -297,7 +302,7 @@ def chow_generate(request: Request, until: str = Form(...), next_member: str = F
             s["next"] = next_member
         if not chow.generate(archive.club, s, dt.date.fromisoformat(until), mid):
             raise ValueError("No open meeting nights to fill before that date.")
-    return chow_change(request, run)
+    return chow_change(request, run, back="/chow/rotation")
 
 
 @app.post("/chow/order")
@@ -316,7 +321,7 @@ def chow_order(request: Request, member: str = Form(...), op: str = Form(...), m
             if 0 <= j < len(order):
                 order[i], order[j] = order[j], order[i]
         chow.set_order(s, order, mid)
-    return chow_change(request, run, back="/chow#rotation")
+    return chow_change(request, run, back="/chow/rotation")
 
 
 @app.post("/chow/constraints")
@@ -328,7 +333,7 @@ async def chow_constraints(request: Request, mid: str = Depends(chow_leader)):
     weeks = [int(w) for w in form.getlist("not_weeks") if w.isdigit()]
     away = [[form.get("away_from", ""), form.get("away_to", "")]] if form.get("away_from") else []
     return chow_change(request, lambda s: chow.set_constraints(s, who, weeks, away, form.get("note", ""), mid),
-                       back="/chow#rotation")
+                       back="/chow/rotation")
 
 
 # ---------------- admin mode ----------------

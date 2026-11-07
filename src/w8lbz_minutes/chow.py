@@ -203,7 +203,7 @@ def record(club: Club, s: dict, date: str, status: str, by: str, covered_by: str
     x = night(s, date)
     x["status"] = status
     x["covered_by"] = covered_by if status == "covered" else None
-    x["note"] = note.strip()[:80] if status == "covered" else ""
+    x["note"] = note.strip()[:80] if status in ("provided", "covered") else ""  # what they brought
     _log("record", by, date=date, member=x.get("member"), status=status, covered_by=x["covered_by"], note=x["note"])
 
 
@@ -358,8 +358,22 @@ def _parse_day(text: str, year: int) -> dt.date | None:
 
 # ---------------- minutes and email ----------------
 
+def tonight_line(club: Club, date: str, x: dict | None) -> str | None:
+    """The minutes' line on whether tonight's chow was brought (and what), once it's been recorded."""
+    if not x or not x.get("member"):
+        return None
+    what = f" ({x['note']})" if x.get("note") else ""
+    if x.get("status") == "provided":
+        return f"Chow tonight provided by {club.name(x['member'])}{what}."
+    if x.get("status") == "covered" and x.get("covered_by"):
+        return f"Chow tonight provided by {club.name(x['covered_by'])} for {club.name(x['member'])}{what}."
+    if x.get("status") == "missed":
+        return f"Chow tonight: {club.name(x['member'])} did not provide chow."
+    return None
+
+
 def meeting_notes(s_log: list[dict], club: Club, date: str) -> list[str]:
-    """Chow changes made on a meeting's date, oldest first, as lines for that meeting's minutes."""
+    """Schedule changes made on a meeting's date (swaps, reassignments, no-chow nights), oldest first."""
     out = []
     for e in reversed(s_log):
         if dt.date.fromtimestamp(e["at"]).isoformat() != date:
@@ -372,10 +386,14 @@ def meeting_notes(s_log: list[dict], club: Club, date: str) -> list[str]:
             out.append(f"Chow for {_day(e['date'])} changed to {club.name(e['new']) if e['new'] else '(open)'}.")
         elif e["action"] == "no_chow":
             out.append(f"No chow on {_day(e['date'])}{f' ({e['note']})' if e.get('note') else ''}.")
-        elif e["action"] == "record" and e["status"] == "covered" and e.get("covered_by"):
-            out.append(f"Chow tonight provided by {club.name(e['covered_by'])}"
-                       f"{f' ({e['note']})' if e.get('note') else ''}.")
     return out
+
+
+def minutes_section(club: Club, s: dict, s_log: list[dict], date: str, n: int = 4) -> list[str]:
+    """The minutes' Upcoming Chow section: tonight's chow, changes made tonight, then the next few nights."""
+    tonight = tonight_line(club, date, s["nights"].get(date))
+    later = upcoming(s, dt.date.fromisoformat(date) + dt.timedelta(days=1), n=n)
+    return ([tonight] if tonight else []) + meeting_notes(s_log, club, date) + [describe(club, d, x) for d, x in later]
 
 
 def _day(date: str) -> str:

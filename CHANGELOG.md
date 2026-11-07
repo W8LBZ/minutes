@@ -5,11 +5,11 @@ What changed in each version of W8LBZ Minutes. Planned work is in [ROADMAP.md](R
 Versions follow [semantic versioning](https://semver.org): while the app is 0.x, the middle number goes up for new features and the last for fixes. Each version is a git tag (`v0.2.0`), and the app's footer shows the version that's running.
 
 ## Unreleased
-- **Chow schedule** (top menu → Chow), replacing the Secretary's spreadsheet:
+- **Chow schedule** (top menu → Chow), replacing the Secretary's spreadsheet. Leaders get three tabs: Schedule, Rotation, and Past nights & changes.
   - Everyone sees who brings chow each night. A member can **ask another to swap nights**; the other member approves or declines, and both (and the Secretary) get an email.
   - Leaders can assign nights, swap them, mark no-chow nights (holidays), and **fill the schedule** from the rotation. The rotation keeps the same order each round, new members go at the bottom, and limits like "can't do 3rd Thursdays" or "away in February" are respected: that member keeps their turn and gets the next night they can do.
-  - On meeting night the console's Upcoming Chow step records whether chow was **provided, missed or covered** by someone else (e.g. a pizza delivered by a member who couldn't come). Missed nights are listed for the Treasurer (bylaws VII.F).
-  - A new meeting's Upcoming Chow section is filled from the schedule, and chow changes made that night go into its minutes on Submit.
+  - On meeting night the console's Upcoming Chow step records whether chow was **provided or not**, and optionally what was brought (or that someone else brought it). Nights without chow are listed for the Treasurer (bylaws VII.F).
+  - The minutes' Upcoming Chow section is no longer typed in: on Submit it's written from the schedule (tonight's chow, changes made tonight, and the next four nights).
   - `w8lbz-minutes chow-import` brings in the Secretary's .xlsx once.
 - **Members are told when their details change:** an email listing what changed and who changed it, sent to both the old and new address after an email change.
 - **Your profile:** members update their own email, phone, address and birthday (month and day only), and choose which of these other members can see. Changes go straight to the roster sheet (values only), the Secretary gets an email, and officers can undo any change from **Recent changes**. A new email takes effect only after it's confirmed from the new address.

@@ -6,7 +6,7 @@ import pytest
 
 from w8lbz_minutes import chow, console
 from w8lbz_minutes.club import Club
-from w8lbz_minutes.meeting import Meeting
+from w8lbz_minutes.meeting import Item, Meeting
 from w8lbz_minutes.store import Archive
 
 FIX = Path(__file__).parent / "fixtures"
@@ -90,24 +90,30 @@ def test_swap_request_declined_cancelled_or_stale(env, monkeypatch):
 
 def test_meeting_night_record_and_minutes(env, tmp_path, monkeypatch):
     club, s, _ = env
-    s["nights"] = {"2027-01-07": {"member": "amy", "status": "scheduled"},
-                   "2027-01-14": {"member": "bob", "status": "scheduled"}, "2027-01-21": {"member": "cal", "status": "scheduled"}}
-    chow.record(club, s, "2027-01-07", "covered", "sec", covered_by="dee", note="pizza delivered")
-    assert s["nights"]["2027-01-07"] == {"member": "amy", "status": "covered", "covered_by": "dee", "note": "pizza delivered"}
-    chow.swap(club, s, "2027-01-14", "2027-01-21", "sec")
+    today = dt.date.today()
+    d = [(today + dt.timedelta(days=7 * i)).isoformat() for i in range(4)]
+    s["nights"] = {d[0]: {"member": "amy", "status": "scheduled"}, d[1]: {"member": "bob", "status": "scheduled"},
+                   d[2]: {"member": "cal", "status": "scheduled"}, d[3]: {"member": "dee", "status": "scheduled"}}
+    chow.record(club, s, d[0], "provided", "sec", note="brownies")
+    assert chow.tonight_line(club, d[0], s["nights"][d[0]]) == "Chow tonight provided by Amy Able (brownies)."
+    chow.record(club, s, d[0], "missed", "sec", note="ignored")
+    assert chow.tonight_line(club, d[0], s["nights"][d[0]]) == "Chow tonight: Amy Able did not provide chow."
+    chow.record(club, s, d[0], "covered", "sec", covered_by="dee", note="pizza delivered")
+    assert s["nights"][d[0]] == {"member": "amy", "status": "covered", "covered_by": "dee", "note": "pizza delivered"}
+    chow.swap(club, s, d[1], d[2], "sec")
     chow.save(s)
-    # Changes are logged with today's date; pretend the meeting is today.
-    today = dt.date.today().isoformat()
-    notes = chow.meeting_notes(chow.history(), club, today)
-    assert notes[0] == "Chow tonight provided by Dee Dunn (pizza delivered)."
-    assert notes[1].startswith("Chow swap: Bob Baker now has Thursday, January 21")
+    # Changes are logged with today's date, and the meeting is today: only the latest record counts.
+    lines = chow.minutes_section(club, s, chow.history(), d[0])
+    assert lines[0] == "Chow tonight provided by Dee Dunn for Amy Able (pizza delivered)."
+    assert lines[1].startswith("Chow swap: Bob Baker now has")
+    assert lines[2:] == [chow.describe(club, x, s["nights"][x]) for x in d[1:]]
 
     meetings = tmp_path / "meetings"
     meetings.mkdir()
-    Meeting(date=dt.date.today(), status="draft", sections={"Upcoming Chow": []}).save(meetings)
+    Meeting(date=today, status="draft", sections={"Upcoming Chow": [Item("stale line from the start")]}).save(meetings)
     a = Archive(meetings, club)
-    console.submit(a, today)
-    assert [i.text for i in a.by_slug[today].items("Upcoming Chow")] == notes
+    console.submit(a, d[0])
+    assert [i.text for i in a.by_slug[d[0]].items("Upcoming Chow")] == lines
 
 
 def test_describe_and_missed(env):
@@ -162,7 +168,9 @@ def test_chow_page_permissions(env, tmp_path, monkeypatch):
     rid = chow.load()["swaps"][0]["id"]
     c.post(f"/chow/requests/{rid}/answer", data={"approve": 1})
     assert chow.load()["nights"]["2099-01-01"]["member"] == "bob"
+    assert c.get("/chow/rotation").status_code == 404                    # a member has only the schedule
     who["id"] = "sec"  # an officer can lead, so can edit
-    assert "Fill the schedule" in c.get("/chow").text
+    assert "Swap two nights" in c.get("/chow").text and "Fill the schedule" in c.get("/chow/rotation").text
+    assert "Past nights" in c.get("/chow/history").text
     assert c.post("/chow/assign", data={"date": "2099-01-08", "member": "cal"}, follow_redirects=False).status_code == 303
     assert chow.load()["nights"]["2099-01-08"]["member"] == "cal"

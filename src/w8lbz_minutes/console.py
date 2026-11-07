@@ -121,10 +121,8 @@ def apply(archive: Archive, slug: str, data: dict) -> Meeting:
 
 def submit(archive: Archive, slug: str) -> Meeting:
     m = archive.by_slug[slug]
-    # Chow changes made on the meeting's date (swaps, cover, no-chow nights) go into its minutes.
-    have = {i.text for i in m.items("Upcoming Chow")}
-    notes = [n for n in chow.meeting_notes(chow.history(), archive.club, slug) if n not in have]
-    m.sections["Upcoming Chow"] = m.items("Upcoming Chow") + [Item(n) for n in notes]
+    # Upcoming Chow comes from the chow schedule as it stands now: tonight's chow, tonight's changes, what's next.
+    m.sections["Upcoming Chow"] = [Item(t) for t in chow.minutes_section(archive.club, chow.load(), chow.history(), slug)]
     m.status = "published"
     m.save(archive.root)
     archive.reload()
@@ -189,4 +187,4 @@ def chow_tonight(archive: Archive, m: Meeting) -> dict:
     return {"date": m.slug, "member": x.get("member"), "name": club.name(x["member"]) if x.get("member") else None,
             "status": x.get("status", "scheduled") if x else None, "covered_by": x.get("covered_by"),
             "note": x.get("note", ""), "next": chow.describe(club, *nxt[0]) if nxt else None,
-            "notes": chow.meeting_notes(chow.history(), club, m.slug)}
+            "section": chow.minutes_section(club, s, chow.history(), m.slug)}
