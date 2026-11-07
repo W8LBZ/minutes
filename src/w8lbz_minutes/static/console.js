@@ -89,13 +89,14 @@
   window.addEventListener("beforeunload", (e) => { if (saved.classList.contains("dirty")) e.preventDefault(); });
 
   // ---------- steps ----------
+  const STEP_LABEL = { "Upcoming Chow": "Chow" };  // the minutes' section keeps its full name
   function go(i) { S.step = Math.max(0, Math.min(STEPS.length - 1, i)); render(); save(); window.scrollTo(0, 0); }
   document.getElementById("prev").onclick = () => go(S.step - 1);
   document.getElementById("next").onclick = () => go(S.step + 1);
 
   function render() {
     const nav = document.getElementById("steps");
-    nav.replaceChildren(...STEPS.map((s, i) => h("button", { class: i === S.step ? "on" : "", onclick: () => go(i) }, `${i + 1}. ${s}`)));
+    nav.replaceChildren(...STEPS.map((s, i) => h("button", { class: i === S.step ? "on" : "", onclick: () => go(i) }, `${i + 1}. ${STEP_LABEL[s] || s}`)));
     const step = STEPS[S.step];
     panel.replaceChildren(
       step === "Attendance" ? attendance() :
@@ -237,8 +238,8 @@
     const rows = itemRows(arr, set);
     const motion = sec === "New Business" || sec === "Old Business" ? h("button", { class: "btn small ghost", onclick: () => {
       arr.push("Motion: ___ moved to ___, seconded by ___. Passed."); set(arr); render(); save(); } }, "+ Motion") : null;
-    const hint = [HINTS[sec], sec === "Upcoming Chow" ? null : EMPTY_NOTE].filter(Boolean).join(" ");
-    return h("div", {}, h("h2", {}, sec), sec === "Upcoming Chow" ? chowPanel() : null, h("p", { class: "hint" }, hint), rows, motion);
+    const hint = [HINTS[sec], EMPTY_NOTE].filter(Boolean).join(" ");
+    return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, hint), rows, motion);
   }
 
   // ---------- chow: did tonight's member bring it? The rest is read-only, from the chow schedule. ----------
@@ -275,9 +276,9 @@
             h("button", { class: "btn small ghost", onclick: () => { if (!cover.value) return alert("Pick who brought it."); post({ status: "covered", covered_by: cover.value, note: what.value }); } }, "Save"))));
     };
     draw(); showList();
-    return h("div", {}, h("h2", {}, "Upcoming Chow"), box,
+    return h("div", {}, h("h2", {}, "Chow"), box,
       h("p", { class: "hint" }, HINTS["Upcoming Chow"], " ", h("a", { href: "/chow", target: "_blank" }, "Open the Chow page")),
-      h("h3", {}, "In the minutes"), list);
+      h("h3", {}, "In the minutes (Upcoming Chow)"), list);
   }
 
   // ---------- review & submit ----------

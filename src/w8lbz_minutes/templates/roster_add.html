@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Add a member{% endblock %}{% block body %}
 <h1>Add a member</h1>
-<p class="muted">Adds a row to the club roster sheet and a "Joined" row to its Membership Log, and the new member shows up in the app right away, at the bottom of the chow rotation. The Secretary gets an email, and it's listed under Recent changes with who added them. Their sharing choices start off: they set those on their own profile.</p>
+<p class="muted">Adds a row to the club roster sheet and a "Joined" row to its Membership Log, and the new member shows up in the app right away, at the end of the current chow round. The Secretary gets an email, and it's listed under Recent changes with who added them. Their sharing choices start off: they set those on their own profile.</p>
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
 
 {% if ready %}<h2>Guests ready to join</h2>

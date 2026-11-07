@@ -144,7 +144,8 @@ def test_import_matches_misspelled_names_and_fixes_dates(env, tmp_path):
     assert {d: x["member"] for d, x in s["nights"].items()} == {
         "2026-11-05": "amy", "2026-11-12": "bob", "2026-11-26": None, "2026-12-03": "cal"}
     assert s["nights"]["2026-11-26"] == {"member": None, "status": "none", "note": "Thanksgiving"}
-    assert s["order"] == ["amy", "bob", "cal", "dee", "sec"] and s["pending"] == []  # Sam wasn't listed: at the bottom
+    # Sam wasn't listed: he joins at the end of the round, just before Dee (next after Cal's Dec 3)
+    assert s["order"] == ["amy", "bob", "cal", "sec", "dee"] and s["pending"] == []
     assert any("Nov 25" in p for p in problems) and any("Nobody" in p for p in problems)
 
 
@@ -180,3 +181,13 @@ def test_chow_page_permissions(env, tmp_path, monkeypatch):
     assert "Past nights" in c.get("/chow/history").text
     assert c.post("/chow/assign", data={"date": "2099-01-08", "member": "cal"}, follow_redirects=False).status_code == 303
     assert chow.load()["nights"]["2099-01-08"]["member"] == "cal"
+
+
+def test_new_members_join_at_the_end_of_the_round(env):
+    club, s, _ = env
+    s["nights"] = {"2027-01-07": {"member": "amy", "status": "scheduled"}, "2027-01-14": {"member": "bob", "status": "scheduled"}}
+    assert chow.next_up(club, s) == "cal"
+    chow.add_to_rotation(club, s, "sec", "sec")  # everyone from Cal round to Bob goes first
+    assert s["order"] == ["amy", "bob", "sec", "cal", "dee", "old"] and chow.next_up(club, s) == "cal"
+    chow.generate(club, s, dt.date(2027, 2, 18), "sec", today=THU)
+    assert [s["nights"][d]["member"] for d in sorted(s["nights"])] == ["amy", "bob", "cal", "dee", "amy", "bob", "sec"]

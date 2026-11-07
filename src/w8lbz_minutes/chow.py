@@ -122,6 +122,19 @@ def next_up(club: Club, s: dict) -> str | None:
     return order[0] if order else None
 
 
+def add_to_rotation(club: Club, s: dict, mid: str, by: str) -> None:
+    """A new member joins at the end of the current round: just before whoever is next up, so everyone
+    already in the rotation takes their turn first."""
+    if mid in s["order"]:
+        return
+    nxt = next_up(club, s)
+    order = list(s["order"])
+    order.insert(order.index(nxt) if nxt in order else len(order), mid)
+    if nxt:
+        s["next"] = nxt  # otherwise "after the last night's member" would now point at the newcomer
+    set_order(s, order, by)
+
+
 def generate(club: Club, s: dict, until: dt.date, by: str, today: dt.date | None = None) -> list[str]:
     """Fill empty meeting nights up to `until`, continuing the rotation from next_up().
 
@@ -334,14 +347,15 @@ def import_xlsx(club: Club, path: Path, order: list[str], by: str, year: int) ->
         else:
             problems.append(f"Rotation: no member matches {n!r}")
     s["order"] = list(dict.fromkeys(s["order"]))
-    # Active members missing from the spreadsheet go to the bottom of the rotation, as new members do.
+    # Active members missing from the spreadsheet join the way new members do: at the end of the current round.
     active = sorted((m for m in club.members.values() if m.status.lower() not in ("inactive", "silent key")),
                     key=lambda m: (m.last, m.first))
     missing = [m.id for m in active if m.id not in s["order"]]
     if missing:
-        problems.append("Not on the spreadsheet, added at the bottom of the rotation: "
+        problems.append("Not on the spreadsheet, added at the end of the current round: "
                         + ", ".join(club.name(m) for m in missing))
-    s["order"] += missing
+    for m in missing:
+        add_to_rotation(club, s, m, by)
     return s, problems
 
 
