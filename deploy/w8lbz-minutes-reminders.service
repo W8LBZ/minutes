@@ -1,0 +1,17 @@
+[Unit]
+Description=Email W8LBZ members about business items coming due
+
+[Service]
+Type=oneshot
+User=minutes
+Group=minutes
+WorkingDirectory=/opt/w8lbz-minutes
+Environment=W8LBZ_CONFIG=/etc/w8lbz-minutes/club.yaml
+Environment=W8LBZ_DATA=/var/lib/w8lbz-minutes
+EnvironmentFile=-/etc/w8lbz-minutes/env
+ExecStart=/opt/w8lbz-minutes/.venv/bin/w8lbz-minutes reminders
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/w8lbz-minutes

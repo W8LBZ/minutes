@@ -12,12 +12,13 @@ import logging
 import shutil
 import time
 
-from . import auth, chow
+from . import ai, auth, business, chow
+from .club import DATA
 from .meeting import SECTIONS, Item, Meeting
 from .store import Archive
 
 log = logging.getLogger("w8lbz.console")
-CARRY_FORWARD = ("Old Business", "Upcoming Events")  # copied from the previous meeting as a starting point
+CARRY_FORWARD = ("Upcoming Events",)  # copied from the previous meeting as a starting point (business is tracked)
 
 
 def _key(s: str) -> str:
@@ -32,15 +33,94 @@ def start(archive: Archive, date: dt.date, leader: str | None) -> Meeting:
     for sec in SECTIONS:
         m.sections[sec] = []
     if prev:
-        # Last week's Old + New Business both become this week's Old Business.
-        m.sections["Old Business"] = [Item(i.text) for i in prev.items("Old Business") + prev.items("New Business")]
         m.sections["Upcoming Events"] = [Item(i.text) for i in prev.items("Upcoming Events")]
+    # Old Business: every tracked item still open (business.py).
+    m.sections.update(business_sections(archive, m.slug))
     # The next few chow nights after tonight, from the chow schedule.
     later = [(d, x) for d, x in chow.upcoming(chow.load(), date + dt.timedelta(days=1), n=4)]
     m.sections["Upcoming Chow"] = [Item(chow.describe(archive.club, d, x)) for d, x in later]
     m.save(archive.root)
     archive.reload()
     return archive.by_slug[m.slug]
+
+
+def business_state(archive: Archive) -> dict:
+    s = business.load()
+    if not s["seeded"]:
+        business.seed(s, archive.meetings)
+        business.save(s)
+    return s
+
+
+def business_sections(archive: Archive, slug: str, s: dict | None = None) -> dict[str, list[Item]]:
+    s = s or business_state(archive)
+    return {k: [Item(t) for t in v] for k, v in business.sections(s, archive.club, slug, _since(archive, slug)).items()}
+
+
+def _since(archive: Archive, slug: str) -> str | None:
+    prev = previous(archive, dt.date.fromisoformat(slug))
+    return prev.slug if prev else None
+
+
+def business_items(archive: Archive, slug: str, s: dict | None = None) -> dict:
+    """The console's Old and New Business: tracked items as of this meeting."""
+    s = s or business_state(archive)
+    since = _since(archive, slug)
+    old, new = business.for_meeting(s, slug, since)
+    return {"old": [business.view(archive.club, x, slug, since) for x in old],
+            "new": [business.view(archive.club, x, slug, since) for x in new],
+            "notes": [{**n, "name": archive.club.name(n["by"])} for n in business.notes_for(s, slug)]}
+
+
+def sync_business(archive: Archive, slug: str, s: dict) -> None:
+    """After a business item changes, rewrite that draft's Old and New Business (the live view reads them)."""
+    m = archive.by_slug.get(slug)
+    if m and m.status == "draft":
+        m.sections.update(business_sections(archive, slug, s))
+        m.save(archive.root)
+
+
+# ---------------- AI "ask about" prompts for Community Reports (ai.ask_about) ----------------
+REPORTS_BACK = 4    # a member's last few reports, however many meetings apart (they may come every third week)
+REPORTS_DAYS = 365  # but nothing older than a year
+
+
+def report_histories(archive: Archive) -> dict[str, list[tuple[str, str]]]:
+    """Each active member's last few community reports from submitted minutes, oldest first."""
+    out: dict[str, list[tuple[str, str]]] = {}
+    cutoff = dt.date.today() - dt.timedelta(days=REPORTS_DAYS)
+    for mt in archive.meetings:  # newest first
+        if mt.status == "draft" or mt.date < cutoff:
+            continue
+        for it in mt.items("Community Reports"):
+            m = archive.club.members.get(it.member or "")
+            if m and m.status.lower() not in ("inactive", "silent key") and len(out.setdefault(m.id, [])) < REPORTS_BACK:
+                out[m.id].append((mt.slug, it.text))
+    return {mid: r[::-1] for mid, r in out.items()}
+
+
+def refresh_ask_about(archive: Archive) -> int:
+    """Ask the AI what's worth following up for every member; saved for the console. Returns members covered."""
+    hist = report_histories(archive)
+    prompts = ai.ask_about(archive.club, hist)
+    data = {"at": int(time.time()), "model": archive.club.ai.get("model"),
+            "members": {mid: {"prompts": p, "upto": hist[mid][-1][0]} for mid, p in prompts.items()}}
+    path = DATA / "ask-about.json"
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=1))
+    tmp.chmod(0o600)
+    tmp.replace(path)
+    return len(prompts)
+
+
+def ask_about_for(history: dict[str, list]) -> dict[str, list[str]]:
+    """Saved prompts that are still current: made after the member's latest report shown in the console."""
+    p = DATA / "ask-about.json"
+    if not p.exists():
+        return {}
+    members = json.loads(p.read_text()).get("members", {})
+    return {mid: e["prompts"] for mid, e in members.items()
+            if history.get(mid) and e.get("upto") == history[mid][0][0]}
 
 
 def previous(archive: Archive, date: dt.date) -> Meeting | None:
@@ -94,6 +174,8 @@ def context(archive: Archive, m: Meeting) -> dict:
         "invite_after": int(club.info.get("invite_after_visits", 3)),
         "email": {"roster": len(recipients(archive)), "only_to": club.email.get("only_to")},
         "chow": chow_tonight(archive, m),
+        "business": business_items(archive, m.slug),
+        "ask_about": ask_about_for(history),
     }
 
 
@@ -113,6 +195,7 @@ def apply(archive: Archive, slug: str, data: dict) -> Meeting:
     m.sections = {s: [Item(i["text"].strip(), i.get("member") or None)
                       for i in d.get("sections", {}).get(s, []) if i.get("text", "").strip()]
                   for s in SECTIONS}
+    m.sections.update(business_sections(archive, slug))  # tracked: never from the browser
     m.save(archive.root)
     state_path(archive, slug).write_text(json.dumps(data.get("state") or {}))
     archive.reload()
@@ -123,6 +206,7 @@ def submit(archive: Archive, slug: str) -> Meeting:
     m = archive.by_slug[slug]
     # Upcoming Chow comes from the chow schedule as it stands now: tonight's chow, tonight's changes, what's next.
     m.sections["Upcoming Chow"] = [Item(t) for t in chow.minutes_section(archive.club, chow.load(), chow.history(), slug)]
+    m.sections.update(business_sections(archive, slug))
     m.status = "published"
     m.save(archive.root)
     archive.reload()
@@ -135,6 +219,9 @@ def discard(archive: Archive, slug: str) -> None:
     if m.status != "draft":
         raise ValueError("Only drafts can be discarded")
     shutil.rmtree(archive.root / slug)
+    s = business.load()
+    business.forget_meeting(s, slug)
+    business.save(s)
     archive.reload()
 
 

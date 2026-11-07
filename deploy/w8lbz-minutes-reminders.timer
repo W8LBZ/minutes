@@ -1,0 +1,9 @@
+[Unit]
+Description=Business item reminders, daily at 8 am
+
+[Timer]
+OnCalendar=*-*-* 08:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

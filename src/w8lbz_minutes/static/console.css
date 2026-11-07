@@ -36,3 +36,18 @@ textarea { resize: vertical; min-height: 2.4rem; }
 .share:hover { background: #dfe7d2; } .share.ok { background: #2f3d1c; color: #fff; } .small { font-size: .85rem; }
 .chowbox { border: 1px solid #d9dccf; border-radius: .5rem; background: #f6f8f1; padding: .6rem .8rem; margin: .4rem 0 .8rem; }
 .chowbox .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: .4rem 0; } .chowbox select, .chowbox input { font: inherit; padding: .2rem; }
+.bizitem { background: #fff; border: 1px solid #e1e4d8; border-radius: .8rem; padding: .7rem .9rem; margin: .6rem 0;
+  box-shadow: 0 1px 3px rgba(40, 50, 20, .07); } .bizitem .meta { font-size: .9rem; color: #556; }
+.bizitem textarea { border: 1px solid #d6d9cc; border-radius: .5rem; padding: .45rem .6rem; }
+.bizitem.done textarea { text-decoration: line-through; color: #778; } .bizitem.overdue { border-left: 4px solid #b3261e; } .bizitem.done { background: #f7f8f3; }
+.bizitem select, .bizitem input[type=date] { font: inherit; padding: .15rem; }
+.bizcomment { background: #f4f6ef; border-radius: .6rem; padding: .25rem .5rem; margin: .25rem 0; font-size: .95rem; }
+.notesbox { border: 1px solid #d9dccf; border-radius: .5rem; padding: .2rem .7rem .5rem; margin-top: 1rem; }
+.askabout ul { margin: .2rem 0 .4rem 1.1rem; padding: 0; font-weight: 600; } .askabout details summary { cursor: pointer; }
+.badge.ai { background: #6b5fb5; color: #fff; }
+.notecard { background: #fff; border: 1px solid #e1e4d8; border-radius: .7rem; padding: .6rem .8rem; margin: .5rem 0; }
+.notecard .badge { margin-left: .5rem; } .notetext { margin: .3rem 0 .2rem; white-space: pre-wrap; font-size: 1.02rem; }
+.notebtns { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .6rem; }
+.notelead { font-size: 1rem; color: #333; line-height: 1.45; margin: .2rem 0 .4rem; }
+.bizitem .combo > input { padding: .25rem 1.8rem .25rem .5rem; border-radius: .4rem; width: 13rem; height: auto; }
+.bizitem input[type=date] { border: 1px solid #cfd3c4; border-radius: .4rem; padding: .2rem .4rem; }

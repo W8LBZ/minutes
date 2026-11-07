@@ -6,6 +6,7 @@ club:
   callsign: W0XYZ
   meeting_day: Thursday
   invite_after_visits: 3   # remind the leader to invite a guest to apply on their Nth visit
+  remind_days_before: 3    # business item owners get an email this many days before the due date (and once if overdue)
   date_formats:          # strftime codes; %-d = day without leading zero
     list: "%b %-d, %Y"    # tables, e.g. Nov 5, 2026
     document: "%B %-d, %Y"  # minutes header, e.g. November 5, 2026
@@ -33,6 +34,12 @@ links:  # shown in the "Club Links" footer of the minutes and on the Links page
 
 # Offices whose holders can add new members from the Roster page (default: Secretary and Treasurer).
 # roster_keepers: [Secretary, Treasurer]
+
+# AI assistance (suggested follow-ups from the minutes), through OpenRouter. Needs the API key in the
+# environment too: W8LBZ_OPENROUTER_KEY=... in /etc/w8lbz-minutes/env. Leave out to keep AI off.
+# ai:
+#   model: provider/model-name   # any chat model id from openrouter.ai/models
+#   enabled: true
 
 roster:  # the club roster Google Sheet (share it with the service account as Viewer)
   sheet_id: REPLACE_ME

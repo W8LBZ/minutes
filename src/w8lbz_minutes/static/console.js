@@ -8,7 +8,8 @@
     "Old Business", "New Business", "Winners", "Upcoming Chow", "Upcoming Events", "Review"];
   const EMPTY_NOTE = "Leave it empty if there's nothing this week; empty sections are left out of the minutes.";
   const HINTS = {
-    "Old Business": "Carried forward from last meeting (its Old and New Business). Delete what's finished, update the rest.",
+    "Old Business": "Every business item still open, carried from meeting to meeting until it's marked done. Update the text, give it an owner or a due date, or mark it done; done items show as done in tonight's minutes, then drop off.",
+    "New Business": "Each item you add here is tracked: next week it's in Old Business, and it stays there until it's marked done.",
     "Upcoming Events": "Carried forward from last meeting. Delete past events, add new ones.",
     "Winners": "e.g. “50/50 drawing – Jim F $7.50” and “Weekly drawing – Dave G, not registered (up to $62)”.",
     "Upcoming Chow": "This section comes from the chow schedule and is updated when you submit. To change who brings chow, use the Chow page.",
@@ -175,6 +176,25 @@
     if (!S.done.includes(k)) S.done.push(k);
     S.current = null; render(); save();
   }
+  async function noteStatus(n, status) {
+    const r = await fetch(`/business/notes/${n.id}/${status}`, { method: "POST", headers: { Accept: "application/json" },
+      body: new URLSearchParams({ meeting: M.slug }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { alert(j.error || j.detail || "Couldn't save"); return; }
+    D.business = j; render(); save();
+  }
+  // What to ask a member about: the AI's short prompts when there are any, with what they actually said one click away.
+  function followUp(k, past) {
+    if (k.startsWith("g:")) return h("p", { class: "hint" }, "Guest: ask what brought them in, and their license and callsign.");
+    if (!past.length) return h("p", { class: "hint" }, "No earlier reports on record.");
+    const said = past.map(([d, t]) => h("div", { class: "past" }, h("b", {}, d + ": "), t));
+    const asks = (D.ask_about || {})[k];
+    if (!asks) return h("div", {}, h("div", { class: "hint" }, "Follow up on what they said before:"), said);
+    return h("div", { class: "askabout" },
+      h("div", { class: "hint" }, asks.length ? "Ask about " : "Nothing from earlier reports needs a follow-up ", h("span", { class: "badge ai" }, "AI")),
+      asks.length ? h("ul", {}, asks.map((a) => h("li", {}, a))) : null,
+      h("details", {}, h("summary", { class: "hint" }, "What they said before"), said));
+  }
   function reports() {
     const rem = remaining();
     const groups = [["Online", rem.filter((k) => M.remote.includes(k))], ["In person", rem.filter((k) => M.in_person.includes(k))],
@@ -199,8 +219,8 @@
         h("h3", {}, `${fullName(k)} has the floor`),
         k.startsWith("g:") && inviteDue(M.guests.find((g) => "g:" + g.name === k) || { name: k.slice(2) })
           ? h("div", { class: "invitebox" }, `This is ${k.slice(2).split(" ")[0]}'s ${ordinal(visitNo(M.guests.find((g) => "g:" + g.name === k)))} visit. ${INVITE}.`) : null,
-        past.length ? h("div", {}, h("div", { class: "hint" }, "Follow up on what they said before:"),
-          past.map(([d, t]) => h("div", { class: "past" }, h("b", {}, d + ": "), t))) : h("p", { class: "hint" }, k.startsWith("g:") ? "Guest: ask what brought them in, and their license and callsign." : "No earlier reports on record."),
+        (D.business.notes || []).filter((n) => n.by === k).map((n) => h("div", { class: "bizcomment" }, h("b", {}, "They sent a note: "), n.text)),
+        followUp(k, past),
         ta,
         h("div", { class: "row" },
           h("button", { class: "btn", onclick: () => finish(false) }, "Done"),
@@ -211,10 +231,29 @@
       floor = h("div", { class: "floor" }, h("h3", {}, rem.length ? "Who's next?" : "Everyone has reported"),
         h("p", { class: "hint" }, rem.length ? "Press “Suggest next” or call on someone." : "Use “Edit” to change a report, or move on to Old Business."));
     }
+    // Notes members sent in for tonight (Business page). Someone who's here anyway gives their own report.
+    const here = (id) => M.in_person.includes(id) || M.remote.includes(id);
+    const noteCard = (n) => h("div", { class: "notecard" },
+      h("div", {}, h("b", {}, n.name), here(n.by) ? h("span", { class: "badge" }, "here tonight") : null),
+      h("div", { class: "notetext" }, n.text),
+      h("div", { class: "notebtns" },
+        here(n.by)
+          ? h("button", { class: "btn small", onclick: async () => {
+              S.reports[n.by] = [S.reports[n.by], n.text].filter(Boolean).join(" ");
+              await noteStatus(n, "read"); } }, "Use it in their report")
+          : h("button", { class: "btn small", onclick: async () => {
+              S.others.push(`${n.name} sent a note: ${n.text}`);
+              await noteStatus(n, "read"); } }, "Read it out, add it to the minutes"),
+        h("button", { class: "btn small ghost", onclick: () => noteStatus(n, "dismissed") }, "Skip")));
+    const notes = (D.business.notes || []).length ? h("div", { class: "notesbox" },
+      h("h3", {}, `Notes sent in (${D.business.notes.length})`),
+      h("p", { class: "notelead" }, "Members sent these for tonight. Read each one out, then add it to the minutes. " +
+        "If they came after all, let them give their report and skip the note (or use it in their report)."),
+      D.business.notes.map(noteCard)) : null;
     const others = h("div", {}, h("h3", { style: "margin-top:1.2rem" }, "Other reports"),
       h("p", { class: "hint" }, "For news passed along by someone who isn't present, e.g. “Jeremy sent a message recommending…”."),
       itemRows(S.others, (arr) => { S.others = arr; }));
-    return h("div", {}, h("h2", {}, "Community Reports"), h("div", { class: "cols2" }, queue, h("div", {}, floor, others)));
+    return h("div", {}, h("h2", {}, "Community Reports"), notes, h("div", { class: "cols2" }, queue, h("div", {}, floor, others)));
   }
 
   // ---------- plain list sections ----------
@@ -233,6 +272,7 @@
   }
   function listSection(sec) {
     if (sec === "Upcoming Chow") return chowSection();
+    if (sec === "Old Business" || sec === "New Business") return businessSection(sec);
     const arr = (M.sections[sec] || []).map((i) => i.text);
     const set = (a) => { M.sections[sec] = a.map((t) => ({ text: t, member: null })); };
     const rows = itemRows(arr, set);
@@ -240,6 +280,58 @@
       arr.push("Motion: ___ moved to ___, seconded by ___. Passed."); set(arr); render(); save(); } }, "+ Motion") : null;
     const hint = [HINTS[sec], EMPTY_NOTE].filter(Boolean).join(" ");
     return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, hint), rows, motion);
+  }
+
+  // ---------- business: tracked items (business.py); every change is saved on the server at once ----------
+  function businessSection(sec) {
+    const isNew = sec === "New Business";
+    const box = h("div", {});
+    const send = async (url, data) => {
+      const r = await fetch(url, { method: "POST", headers: { Accept: "application/json" },
+        body: new URLSearchParams({ meeting: M.slug, ...data }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(j.error || j.detail || "Couldn't save"); return; }
+      D.business = j; saved.textContent = "Saved ✓"; saved.className = "saved"; draw();
+    };
+    const fmtDate = (d) => new Date(d + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const row = (x) => {
+      const done = x.status === "done";
+      const ta = h("textarea", { rows: 1, oninput: (e) => grow(e.target),
+        onchange: (e) => send(`/business/${x.id}/edit`, { text: e.target.value }) });
+      ta.value = x.text;
+      // Type a name (the list filters as you type); the server matches it to a member.
+      const owner = makeCombo(h("input", { placeholder: "Owner", title: "Owner",
+        value: x.owner ? (people[x.owner]?.name || "") : "", class: "ownerbox",
+        onchange: (e) => send(`/business/${x.id}/edit`, { owner: e.target.value.trim() }) }),
+        D.members.map((m) => ({ value: m.name, note: m.callsign || "" })), { empty: "(no owner)" });
+      const due = h("input", { type: "date", value: x.due || "", title: "Due date",
+        onchange: (e) => send(`/business/${x.id}/edit`, { due: e.target.value }) });
+      return h("div", { class: "bizitem" + (done ? " done" : "") + (x.overdue ? " overdue" : "") },
+        h("div", { class: "row" }, ta,
+          h("button", { class: "btn small" + (done ? "" : " ghost"), title: done ? "Not done after all" : "Mark done",
+            onclick: () => send(`/business/${x.id}/done`, { done: done ? 0 : 1 }) }, done ? "✓ Done" : "Done"),
+          isNew ? h("button", { class: "btn small ghost", title: "Delete (added by mistake)",
+            onclick: () => { if (confirm("Delete this item?")) send(`/business/${x.id}/delete`, {}); } }, "✕") : null),
+        h("div", { class: "row meta" }, owner, " due ", due,
+          x.overdue ? h("span", { class: "badge warn" }, `overdue since ${fmtDate(x.due)}`) : null,
+          !isNew ? h("span", { class: "hint" }, ` since ${fmtDate(x.opened)}`) : null),
+        (x.new_comments || []).map((c) => h("div", { class: "bizcomment" }, h("b", {}, `${c.name}: `), c.text)));
+    };
+    const add = () => {
+      const ta = h("textarea", { rows: 1, placeholder: isNew ? "New item…" : "", oninput: (e) => grow(e.target) });
+      const go = () => { if (ta.value.trim()) send("/business/add", { text: ta.value }); };
+      return h("div", {}, h("div", { class: "row" }, ta, h("button", { class: "btn small", onclick: go }, "+ Add item")),
+        h("button", { class: "btn small ghost", onclick: () => { ta.value = "Motion: ___ moved to ___, seconded by ___. Passed."; ta.focus(); grow(ta); } }, "+ Motion"));
+    };
+    const draw = () => {
+      const items = isNew ? D.business.new : D.business.old;
+      box.replaceChildren(
+        ...(items.length ? items.map(row) : [h("p", { class: "muted" }, isNew ? "Nothing new yet." : "No open items.")]),
+        isNew ? add() : h("p", { class: "hint" }, "New items go in New Business. ", h("a", { href: "/business", target: "_blank" }, "All business items")));
+      setTimeout(() => box.querySelectorAll("textarea").forEach(grow), 0);
+    };
+    draw();
+    return h("div", {}, h("h2", {}, sec), h("p", { class: "hint" }, HINTS[sec]), box);
   }
 
   // ---------- chow: did tonight's member bring it? The rest is read-only, from the chow schedule. ----------

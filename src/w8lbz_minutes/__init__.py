@@ -19,6 +19,9 @@ def main() -> None:
     ci.add_argument("--next", help="who the rotation continues with (surname)")
     ci.add_argument("--year", type=int, default=2026, help="year for dates written like 5-Mar")
     ci.add_argument("--write", action="store_true", help="save it (refuses if a chow schedule already exists)")
+    rem = sub.add_parser("reminders", help="email owners about business items coming due or past due (run daily)")
+    rem.add_argument("--dry-run", action="store_true", help="print what would be sent; send and record nothing")
+    sub.add_parser("ai-ask-about", help="ask the AI for 'ask about' prompts for each member's community report (also runs after each Submit)")
     srv = sub.add_parser("serve", help="run the web UI")
     srv.add_argument("--host", default="127.0.0.1")
     srv.add_argument("--port", type=int, default=8000)
@@ -50,7 +53,47 @@ def main() -> None:
         if not (d / "minutes.md").exists():
             raise SystemExit(f"No minutes for {a.date}")
         shutil.rmtree(d)
+        from . import business
+        s = business.load()
+        if n := business.forget_meeting(s, d.name):
+            print(f"Removed {n} business item(s) added at that meeting.")
+        business.save(s)
         print(f"Deleted {d}. Restart the web service so it drops it from memory.")
+    elif a.cmd == "reminders":
+        import datetime as dt
+        from . import auth, business
+        from .club import Club
+        club = Club()
+        url = f"https://{club.auth.get('rp_id')}"
+        today = dt.date.today()
+        with business.locked():
+            s = business.load()
+            due = business.due_reminders(s, today, int(club.info.get("remind_days_before", 3)))
+            for mid, items in due.items():
+                m = club.members.get(mid)
+                if not m or not m.email or m.status.lower() in ("inactive", "silent key"):
+                    continue
+                subject, body = business.reminder_email(club, mid, items, today, url)
+                if a.dry_run:
+                    print(f"--- to {m.name} <{m.email}>: {subject}\n{body}\n")
+                    continue
+                try:
+                    auth.send_email(m.email, subject, body, only_to=club.email_only_to())
+                except Exception as e:  # one bad address shouldn't stop the others
+                    print(f"couldn't email {m.name}: {e}")
+                    continue
+                business.mark_reminded(items)
+                print(f"reminded {m.name} about {len(items)} item(s)")
+            if not a.dry_run:
+                business.save(s)
+        if not due:
+            print("nothing to remind")
+    elif a.cmd == "ai-ask-about":
+        from . import console
+        from .club import Club, MEETINGS
+        from .store import Archive
+        n = console.refresh_ask_about(Archive(MEETINGS, Club()))
+        print(f"prompts for {n} members saved")
     elif a.cmd == "chow-import":
         from . import chow
         from .club import Club
