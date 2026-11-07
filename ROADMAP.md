@@ -44,9 +44,8 @@ For Pat (Treasurer), later. The bylaws (VII) set dues at $182/year ($3.50 a week
 - **Officers only:** treasurer data is never shown to other members.
 - **Not a bookkeeping system:** if Pat uses QuickBooks (to be confirmed), the app exports what QuickBooks needs rather than duplicating it.
 
-## AI assistance (after tracked business items)
-These build on tracked business items and use the typed minutes we already have, so none of them needs audio.
-- **Suggested follow-ups:** when minutes are submitted, AI reads them and proposes tracked items with an owner and due date (e.g. "Jim will call the park about Field Day"). The leader accepts, edits or dismisses each one. It also flags business that has gone quiet for several weeks.
+## AI assistance
+Suggested follow-ups are done. Next, using the typed minutes we already have (no audio needed):
 - **Summaries:** a short "this week at the club" paragraph at the top of the minutes email, and later for the Discord post.
 - **Ask the archive:** questions like "when did we last discuss the tower?", answered with links to the minutes they came from.
 - **Ground rules:**

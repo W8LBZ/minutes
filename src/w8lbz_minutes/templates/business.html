@@ -3,6 +3,27 @@
 <p class="muted">Club business from the meetings. Each item stays in Old Business every week until it's marked done, so nothing gets dropped.
 {% if leader %}Leaders can change any item; members can update the ones they own.{% else %}If an item is yours, you can update it or mark it done.{% endif %}</p>
 {% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+{% if note %}<p class="msg ok">{{ note }}</p>{% endif %}
+
+{% if suggestions or ai_on %}<section class="suggestions" id="suggestions">
+<h2>Suggested follow-ups <span class="badge ai">AI</span></h2>
+<p class="hint">An AI read the minutes and suggests these. Nothing is added until you accept it: check each one, fix the wording, owner or date, then Accept, or Dismiss it.</p>
+{% for g in suggestions %}{% set it = by_id.get(g.item) %}<div class="sugg">
+  <form method="post" action="/business/suggestions/{{ g.id }}/accept" class="profile">
+    {% if g.kind == 'update' and it %}<div><b>For:</b> {{ it.text }}</div>
+    <input type="hidden" name="text" value="">
+    {% else %}<label>Item <textarea name="text" rows="2">{{ g.text }}</textarea></label>{% endif %}
+    <label>Owner <select name="owner"><option value="">(nobody)</option>{% for m in members %}<option value="{{ m.id }}" {{ 'selected' if m.id == g.owner }}>{{ m.name }}</option>{% endfor %}</select></label>
+    <label>Due <input type="date" name="due" value="{{ g.due or '' }}"></label>
+    <p class="hint">From the <a href="/meetings/{{ g.meeting }}">{{ fmt(g.meeting) }}</a> minutes{% if g.why %}: “{{ g.why }}”{% endif %}</p>
+    <button class="btn small">{{ 'Accept the change' if g.kind == 'update' else 'Accept' }}</button>
+  </form>
+  <form method="post" action="/business/suggestions/{{ g.id }}/dismiss"><button class="btn small ghost">Dismiss</button></form>
+</div>{% else %}<p class="muted">No suggestions waiting.</p>{% endfor %}
+{% if ai_on %}<form method="post" action="/business/suggest" class="inline">Ask again for the minutes of
+  <select name="meeting">{% for m in submitted %}<option value="{{ m.slug }}">{{ fmt(m.slug) }}</option>{% endfor %}</select>
+  <button class="btn small ghost">Suggest follow-ups</button> <span class="hint">This happens by itself when minutes are submitted. It takes a few seconds.</span></form>{% endif %}
+</section>{% endif %}
 
 <h2>Open <span class="muted small">{{ open_items|length }}</span></h2>
 <ul class="business">{% for x in open_items %}{% set mine = leader or x.owner == me.id %}<li class="{{ 'overdue' if x.overdue }}">
@@ -11,6 +32,7 @@
     {% if x.owner %}<a href="/members/{{ x.owner }}">{{ x.owner_name }}</a>{% else %}No owner{% endif %}
     {% if x.due %} · <span class="{{ 'late' if x.overdue }}">due {{ fmt(x.due) }}{% if x.overdue %} (overdue){% endif %}</span>{% endif %}
     {% if x.agenda and x.agenda > today %} · on the agenda for {{ fmt(x.agenda) }}{% endif %}
+    {% if x.quiet %} · <span class="badge warn" title="Nothing has changed on it for weeks">quiet for a while: still on?</span>{% endif %}
     · since <a href="/meetings/{{ x.opened }}">{{ fmt(x.opened) }}</a>
   </div>
   {% if mine %}<details class="edit"><summary>Change</summary>

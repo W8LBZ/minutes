@@ -35,6 +35,7 @@ def load() -> dict:
     s = json.loads(p.read_text()) if p.exists() else {}
     s.setdefault("items", [])
     s.setdefault("seeded", False)
+    s.setdefault("suggestions", [])  # from the AI (ai.py); pending until a leader accepts or dismisses
     return s
 
 
@@ -176,6 +177,51 @@ def forget_meeting(s: dict, date: str) -> int:
     return before - len(s["items"])
 
 
+# ---------------- AI suggestions: never applied until a person accepts them ----------------
+
+def add_suggestions(s: dict, meeting: str, found: list[dict], model: str) -> int:
+    """Store suggestions for a meeting, replacing that meeting's earlier pending ones."""
+    s["suggestions"] = [x for x in s["suggestions"] if not (x["meeting"] == meeting and x["status"] == "pending")]
+    for f in found:
+        s["suggestions"].append({"id": secrets.token_hex(5), "meeting": meeting, "status": "pending",
+                                 "model": model, "at": int(time.time()), **f})
+    return len(found)
+
+
+def accept_suggestion(s: dict, sid: str, by: str, text: str | None = None, owner: str | None = None,
+                      due: str | None = None) -> dict:
+    """The leader's (possibly edited) version of a suggestion becomes a tracked item, or updates one."""
+    g = next((x for x in s["suggestions"] if x["id"] == sid and x["status"] == "pending"), None)
+    if not g:
+        raise ValueError("That suggestion was already handled.")
+    text = g["text"] if text is None else text
+    owner = g["owner"] if owner is None else owner
+    due = g["due"] if due is None else due
+    if g["kind"] == "update":
+        x = edit(s, g["item"], by, owner=owner, due=due)
+        _note(x, by, "owner/due from an AI suggestion, accepted")
+    else:
+        x = add(s, text, by, owner=owner, due=due, opened=g["meeting"], note="added from an AI suggestion")
+    g["status"], g["result"] = "accepted", x["id"]
+    return x
+
+
+def dismiss_suggestion(s: dict, sid: str, by: str) -> None:
+    g = next((x for x in s["suggestions"] if x["id"] == sid and x["status"] == "pending"), None)
+    if not g:
+        raise ValueError("That suggestion was already handled.")
+    g["status"], g["by"] = "dismissed", by
+
+
+QUIET_WEEKS = 6
+
+
+def quiet(x: dict, today: str) -> bool:
+    """Open, and nothing has changed for QUIET_WEEKS weeks: worth asking about."""
+    last = max((h["at"] for h in x["history"]), default=0)
+    return x["status"] == "open" and (dt.date.fromisoformat(today) - dt.date.fromtimestamp(last)).days >= 7 * QUIET_WEEKS
+
+
 # ---------------- what goes in a meeting ----------------
 
 def for_meeting(s: dict, date: str, since: str | None = None) -> tuple[list[dict], list[dict]]:
@@ -210,7 +256,7 @@ def sections(s: dict, club: Club, date: str, since: str | None = None) -> dict[s
 def view(club: Club, x: dict, today: str) -> dict:
     """An item for the console and the Business page."""
     return {**x, "owner_name": club.name(x["owner"]) if x["owner"] else None,
-            "overdue": bool(x["status"] == "open" and x["due"] and x["due"] < today)}
+            "overdue": bool(x["status"] == "open" and x["due"] and x["due"] < today), "quiet": quiet(x, today)}
 
 
 # ---------------- reminders (the daily job: `w8lbz-minutes reminders`) ----------------

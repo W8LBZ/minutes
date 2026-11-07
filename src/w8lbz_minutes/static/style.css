@@ -88,3 +88,5 @@ ul.business { list-style: none; padding: 0; } ul.business > li { border-bottom: 
 ul.business .text { white-space: pre-wrap; } ul.business li.overdue { border-left: 3px solid #b3261e; padding-left: .6rem; }
 ul.business .late { color: #b3261e; font-weight: 600; } ul.business.done .text { color: #667; }
 ul.business form { display: inline-block; margin-top: .3rem; }
+section.suggestions { border: 1px solid #c9c2e6; background: #f6f4fc; border-radius: .5rem; padding: .3rem 1rem .8rem; margin: 1rem 0 1.5rem; }
+.badge.ai { background: #6b5fb5; color: #fff; } .sugg { border-bottom: 1px solid #ddd8f0; padding: .5rem 0; } .sugg form { display: inline-block; vertical-align: bottom; }

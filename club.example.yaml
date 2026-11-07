@@ -35,6 +35,12 @@ links:  # shown in the "Club Links" footer of the minutes and on the Links page
 # Offices whose holders can add new members from the Roster page (default: Secretary and Treasurer).
 # roster_keepers: [Secretary, Treasurer]
 
+# AI assistance (suggested follow-ups from the minutes), through OpenRouter. Needs the API key in the
+# environment too: W8LBZ_OPENROUTER_KEY=... in /etc/w8lbz-minutes/env. Leave out to keep AI off.
+# ai:
+#   model: provider/model-name   # any chat model id from openrouter.ai/models
+#   enabled: true
+
 roster:  # the club roster Google Sheet (share it with the service account as Viewer)
   sheet_id: REPLACE_ME
   tab: Member Roster

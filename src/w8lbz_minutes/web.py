@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import business, chow, console, membership, profile
+from . import ai, business, chow, console, membership, profile
 from . import auth as authmod
 from .auth import Auth, _safe_next
 from .club import DATA, PREVIEW
@@ -226,7 +226,8 @@ def business_change(request: Request, fn, meeting: str = "", back: str = "/busin
         except ValueError as e:
             if request.headers.get("accept", "").startswith("application/json"):
                 return JSONResponse({"error": str(e)}, status_code=409)
-            return RedirectResponse(f"{back}?error=" + quote(str(e)), status_code=303)
+            path, _, frag = back.partition("#")
+            return RedirectResponse(f"{path}?error=" + quote(str(e)) + (f"#{frag}" if frag else ""), status_code=303)
         business.save(s)
         if meeting:
             console.sync_business(archive, meeting, s)
@@ -242,7 +243,7 @@ def _may_edit_item(request: Request, s: dict, iid: str) -> None:
 
 
 @app.get("/business", response_class=HTMLResponse)
-def business_page(request: Request, error: str = "", mid: str = Depends(me)):
+def business_page(request: Request, error: str = "", note: str = "", mid: str = Depends(me)):
     s = console.business_state(archive)
     today = dt.date.today().isoformat()
     items = [business.view(archive.club, x, today) for x in s["items"]]
@@ -250,8 +251,63 @@ def business_page(request: Request, error: str = "", mid: str = Depends(me)):
     done = sorted((x for x in items if x["status"] == "done"), key=lambda x: x["closed"], reverse=True)[:50]
     members = sorted((m for m in archive.club.members.values() if m.status.lower() not in ("inactive", "silent key")),
                      key=lambda m: (m.last, m.first))
-    return page(request, "business.html", open_items=open_, done=done, error=error, leader=can_lead_now(request),
+    leader_ = can_lead_now(request)
+    pending = [g for g in s["suggestions"] if g["status"] == "pending"] if leader_ else []
+    submitted = [m for m in archive.meetings if m.status != "draft"][:6]
+    return page(request, "business.html", open_items=open_, done=done, error=error, note=note, leader=leader_,
+                suggestions=pending, ai_on=ai.configured(archive.club) and leader_, submitted=submitted,
+                by_id={x["id"]: x for x in items},
                 members=members, today=today, fmt=lambda d: dt.date.fromisoformat(d).strftime("%b %-d, %Y"))
+
+
+def run_followups(slug: str) -> str:
+    """Ask the AI for follow-ups from a meeting's minutes and store them as pending suggestions."""
+    m = archive.by_slug[slug]
+    with business.locked():
+        s = console.business_state(archive)
+        open_items = [x for x in s["items"] if x["status"] == "open"]
+    found = ai.suggest_followups(archive.club, m, open_items)  # outside the lock: it takes a few seconds
+    with business.locked():
+        s = console.business_state(archive)
+        n = business.add_suggestions(s, slug, found, archive.club.ai.get("model", ""))
+        business.save(s)
+    _log.info("AI suggested %d follow-ups for %s", n, slug)
+    return f"{n} suggestion{'s' if n != 1 else ''} from the {m.date:%B %-d} minutes." if n else \
+        f"No follow-ups found in the {m.date:%B %-d} minutes."
+
+
+def followups_after_submit(slug: str) -> None:
+    if ai.configured(archive.club):
+        try:
+            run_followups(slug)
+        except Exception:
+            _log.exception("AI follow-ups for %s failed", slug)
+
+
+@app.post("/business/suggest")
+def business_suggest(request: Request, meeting: str = Form(...), mid: str = Depends(leader)):
+    if not ai.configured(archive.club):
+        raise HTTPException(404)
+    get_meeting(meeting)
+    try:
+        msg = run_followups(meeting)
+    except ai.AIError as e:
+        return RedirectResponse("/business?error=" + quote(str(e)), status_code=303)
+    return RedirectResponse("/business?note=" + quote(msg) + "#suggestions", status_code=303)
+
+
+@app.post("/business/suggestions/{sid}/accept")
+def suggestion_accept(request: Request, sid: str, text: str = Form(""), owner: str = Form(""), due: str = Form(""),
+                      mid: str = Depends(leader)):
+    if owner and owner not in archive.club.members:
+        raise HTTPException(404)
+    return business_change(request, lambda s: business.accept_suggestion(s, sid, mid, text or None, owner, due),
+                           back="/business#suggestions")
+
+
+@app.post("/business/suggestions/{sid}/dismiss")
+def suggestion_dismiss(request: Request, sid: str, mid: str = Depends(leader)):
+    return business_change(request, lambda s: business.dismiss_suggestion(s, sid, mid), back="/business#suggestions")
 
 
 @app.post("/business/add")
@@ -939,6 +995,7 @@ def console_submit(request: Request, background: BackgroundTasks, slug: str, mid
     get_meeting(slug)
     console.submit(archive, slug)
     background.add_task(email_minutes, slug, f"{base_url(request)}/meetings/{slug}")
+    background.add_task(followups_after_submit, slug)
     return RedirectResponse(f"/meetings/{slug}", status_code=303)
 
 
